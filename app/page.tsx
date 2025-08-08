@@ -32,10 +32,10 @@ export default function LandingPage() {
         <section id="hero" className="text-center py-16 md:py-24 lg:py-32 bg-gradient-to-br from-app-green-50 to-app-blue-50 dark:from-app-gray-800 dark:to-app-gray-900 rounded-3xl shadow-xl">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-app-gray-900 dark:text-app-gray-50 leading-tight mb-6">
-              DeFi x RWA : The Game Changer
+              DeFi x RWA : Game Changer
             </h1>
             <p className="text-lg md:text-xl text-app-gray-600 dark:text-app-gray-300 mb-10 max-w-2xl mx-auto">
-              Unlock $ 2 Trillion Real World Borderless Liquidity into Blockchain Fixed-price sales, transparent fees, and real yield from actual settlements.
+              Unlock $2+ Trillion Real World Borderless Liquidity into Blockchain Fixed-price sales, transparent fees, and real yield from actual settlements.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Button asChild className="bg-app-green-600 hover:bg-app-green-700 text-white text-lg px-8 py-3 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105">
@@ -55,7 +55,7 @@ export default function LandingPage() {
               The Problem
             </Badge>
             <h2 className="text-4xl font-bold text-app-gray-900 dark:text-app-gray-50 leading-tight">
-              Bridging the $1.7 Trillion Global Trade Finance Gap
+              Bridging $2+ Trillion Global Trade Finance Gap (Statista)
             </h2>
             <p className="text-lg text-app-gray-600 dark:text-app-gray-300">
               Small and Medium Enterprises (SMEs) worldwide face immense challenges in accessing working capital due to traditional, inefficient trade finance systems. This leads to a massive funding gap, hindering growth and innovation.
@@ -77,8 +77,8 @@ export default function LandingPage() {
           </div>
           <div className="relative h-96 w-full rounded-xl overflow-hidden shadow-xl">
             <Image
-              src="/world-financial-gap.png"
-              alt="Global Financial Gap Chart"
+              src="/container-ship.jpg"
+              alt="Container Ship Global Trade"
               fill
               className="object-cover"
               unoptimized={true}
@@ -90,8 +90,8 @@ export default function LandingPage() {
         <section id="solution" className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="relative h-96 w-full rounded-xl overflow-hidden shadow-xl order-2 lg:order-1">
             <Image
-              src="/global-commodity-growth.png"
-              alt="Global Commodity Growth Chart"
+              src="/village-export.jpg"
+              alt="Village Export Activity"
               fill
               className="object-cover"
               unoptimized={true}
