@@ -1,0 +1,273 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%; /* app-gray-50 */
+    --foreground: 240 10% 3.9%; /* app-gray-900 */
+    --card: 0 0% 100%; /* white */
+    --card-foreground: 240 10% 3.9%; /* app-gray-900 */
+    --popover: 0 0% 100%; /* white */
+    --popover-foreground: 240 10% 3.9%; /* app-gray-900 */
+    --primary: 240 5.9% 10%; /* app-green-600 */
+    --primary-foreground: 0 0% 98%; /* white */
+    --secondary: 240 4.8% 95.9%; /* app-gray-100 */
+    --secondary-foreground: 240 5.9% 10%; /* app-gray-800 */
+    --muted: 240 4.8% 95.9%; /* app-gray-100 */
+    --muted-foreground: 240 3.8% 46.1%; /* app-gray-500 */
+    --accent: 240 4.8% 95.9%; /* app-gray-100 */
+    --accent-foreground: 240 5.9% 10%; /* app-gray-800 */
+    --destructive: 0 84.2% 60.2%; /* app-red-600 */
+    --destructive-foreground: 0 0% 98%; /* white */
+    --border: 240 5.9% 90%; /* app-gray-200 */
+    --input: 240 5.9% 90%; /* app-gray-200 */
+    --ring: 240 5.9% 10%; /* app-green-600 */
+    --radius: 0.5rem;
+
+    /* Chart colors using specific app-colors for better distinction */
+    --chart-1: 120 60% 40%; /* app-green-600 */
+    --chart-2: 210 80% 50%; /* app-blue-500 */
+    --chart-3: 30 100% 60%; /* app-orange-500 */
+    --chart-4: 270 80% 60%; /* app-purple-500 */
+    --chart-5: 0 80% 40%; /* app-red-500 */
+
+    /* Custom colors for the app */
+    --app-green-50: 120 60% 97%;
+    --app-green-100: 120 60% 90%;
+    --app-green-200: 120 60% 80%;
+    --app-green-300: 120 60% 70%;
+    --app-green-400: 120 60% 60%;
+    --app-green-500: 120 60% 50%; /* Main green */
+    --app-green-600: 120 60% 40%;
+    --app-green-700: 120 60% 30%;
+    --app-green-800: 120 60% 20%;
+    --app-green-900: 120 60% 10%;
+    --app-green-950: 120 60% 5%;
+
+    --app-blue-50: 210 80% 97%;
+    --app-blue-100: 210 80% 90%;
+    --app-blue-200: 210 80% 80%;
+    --app-blue-300: 210 80% 70%;
+    --app-blue-400: 210 80% 60%;
+    --app-blue-500: 210 80% 50%; /* Main blue */
+    --app-blue-600: 210 80% 40%;
+    --app-blue-700: 210 80% 30%;
+    --app-blue-800: 210 80% 20%;
+    --app-blue-900: 210 80% 10%;
+    --app-blue-950: 210 80% 5%;
+
+    --app-orange-50: 30 100% 97%;
+    --app-orange-100: 30 100% 90%;
+    --app-orange-200: 30 100% 80%;
+    --app-orange-300: 30 100% 70%;
+    --app-orange-400: 30 100% 60%;
+    --app-orange-500: 30 100% 50%; /* Main orange */
+    --app-orange-600: 30 100% 40%;
+    --app-orange-700: 30 100% 30%;
+    --app-orange-800: 30 100% 20%;
+    --app-orange-900: 30 100% 10%;
+    --app-orange-950: 30 100% 5%;
+
+    --app-red-50: 0 80% 97%;
+    --app-red-100: 0 80% 90%;
+    --app-red-200: 0 80% 80%;
+    --app-red-300: 0 80% 70%;
+    --app-red-400: 0 80% 60%;
+    --app-red-500: 0 80% 50%; /* Main red */
+    --app-red-600: 0 80% 40%;
+    --app-red-700: 0 80% 30%;
+    --app-red-800: 0 80% 20%;
+    --app-red-900: 0 80% 10%;
+    --app-red-950: 0 80% 5%;
+
+    --app-purple-50: 270 80% 97%;
+    --app-purple-100: 270 80% 90%;
+    --app-purple-200: 270 80% 80%;
+    --app-purple-300: 270 80% 70%;
+    --app-purple-400: 270 80% 60%;
+    --app-purple-500: 270 80% 50%; /* Main purple */
+    --app-purple-600: 270 80% 40%;
+    --app-purple-700: 270 80% 30%;
+    --app-purple-800: 270 80% 20%;
+    --app-purple-900: 270 80% 10%;
+    --app-purple-950: 270 80% 5%;
+
+    --app-gray-50: 220 10% 98%;
+    --app-gray-100: 220 10% 95%;
+    --app-gray-200: 220 10% 90%;
+    --app-gray-300: 220 10% 80%;
+    --app-gray-400: 220 10% 70%;
+    --app-gray-500: 220 10% 60%;
+    --app-gray-600: 220 10% 50%;
+    --app-gray-700: 220 10% 40%;
+    --app-gray-800: 220 10% 30%;
+    --app-gray-900: 220 10% 20%;
+    --app-gray-950: 220 10% 10%;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%; /* app-gray-950 */
+    --foreground: 0 0% 98%; /* app-gray-50 */
+    --card: 240 10% 3.9%; /* app-gray-900 */
+    --card-foreground: 0 0% 98%; /* app-gray-50 */
+    --popover: 240 10% 3.9%; /* app-gray-900 */
+    --popover-foreground: 0 0% 98%; /* app-gray-50 */
+    --primary: 0 0% 98%; /* app-green-50 */
+    --primary-foreground: 240 5.9% 10%; /* app-gray-900 */
+    --secondary: 240 3.7% 15.9%; /* app-gray-800 */
+    --secondary-foreground: 0 0% 98%; /* app-gray-50 */
+    --muted: 240 3.7% 15.9%; /* app-gray-800 */
+    --muted-foreground: 240 5% 64.9%; /* app-gray-400 */
+    --accent: 240 3.7% 15.9%; /* app-gray-800 */
+    --accent-foreground: 0 0% 98%; /* app-gray-50 */
+    --destructive: 0 62.8% 30.6%; /* app-red-700 */
+    --destructive-foreground: 0 0% 98%; /* white */
+    --border: 240 3.7% 15.9%; /* app-gray-700 */
+    --input: 240 3.7% 15.9%; /* app-gray-700 */
+    --ring: 0 0% 98%; /* app-green-50 */
+
+    /* Chart colors for dark mode */
+    --chart-1: 120 60% 60%; /* app-green-400 */
+    --chart-2: 210 80% 60%; /* app-blue-400 */
+    --chart-3: 30 100% 70%; /* app-orange-400 */
+    --chart-4: 270 80% 70%; /* app-purple-400 */
+    --chart-5: 0 80% 60%; /* app-red-400 */
+
+    /* Custom colors for the app in dark mode */
+    --app-green-50: 120 60% 5%;
+    --app-green-100: 120 60% 10%;
+    --app-green-200: 120 60% 20%;
+    --app-green-300: 120 60% 30%;
+    --app-green-400: 120 60% 40%;
+    --app-green-500: 120 60% 50%; /* Main green */
+    --app-green-600: 120 60% 60%;
+    --app-green-700: 120 60% 70%;
+    --app-green-800: 120 60% 80%;
+    --app-green-900: 120 60% 90%;
+    --app-green-950: 120 60% 95%;
+
+    --app-blue-50: 210 80% 5%;
+    --app-blue-100: 210 80% 10%;
+    --app-blue-200: 210 80% 20%;
+    --app-blue-300: 210 80% 30%;
+    --app-blue-400: 210 80% 40%;
+    --app-blue-500: 210 80% 50%; /* Main blue */
+    --app-blue-600: 210 80% 60%;
+    --app-blue-700: 210 80% 70%;
+    --app-blue-800: 210 80% 80%;
+    --app-blue-900: 210 80% 90%;
+    --app-blue-950: 210 80% 95%;
+
+    --app-orange-50: 30 100% 5%;
+    --app-orange-100: 30 100% 10%;
+    --app-orange-200: 30 100% 20%;
+    --app-orange-300: 30 100% 30%;
+    --app-orange-400: 30 100% 40%;
+    --app-orange-500: 30 100% 50%; /* Main orange */
+    --app-orange-600: 30 100% 60%;
+    --app-orange-700: 30 100% 70%;
+    --app-orange-800: 30 100% 80%;
+    --app-orange-900: 30 100% 90%;
+    --app-orange-950: 30 100% 95%;
+
+    --app-red-50: 0 80% 5%;
+    --app-red-100: 0 80% 10%;
+    --app-red-200: 0 80% 20%;
+    --app-red-300: 0 80% 30%;
+    --app-red-400: 0 80% 40%;
+    --app-red-500: 0 80% 50%; /* Main red */
+    --app-red-600: 0 80% 60%;
+    --app-red-700: 0 80% 70%;
+    --app-red-800: 0 80% 80%;
+    --app-red-900: 0 80% 90%;
+    --app-red-950: 0 80% 95%;
+
+    --app-purple-50: 270 80% 5%;
+    --app-purple-100: 270 80% 10%;
+    --app-purple-200: 270 80% 20%;
+    --app-purple-300: 270 80% 30%;
+    --app-purple-400: 270 80% 40%;
+    --app-purple-500: 270 80% 50%; /* Main purple */
+    --app-purple-600: 270 80% 60%;
+    --app-purple-700: 270 80% 70%;
+    --app-purple-800: 270 80% 80%;
+    --app-purple-900: 270 80% 90%;
+    --app-purple-950: 270 80% 95%;
+
+    --app-gray-50: 220 10% 10%;
+    --app-gray-100: 220 10% 15%;
+    --app-gray-200: 220 10% 20%;
+    --app-gray-300: 220 10% 30%;
+    --app-gray-400: 220 10% 40%;
+    --app-gray-500: 220 10% 50%;
+    --app-gray-600: 220 10% 60%;
+    --app-gray-700: 220 10% 70%;
+    --app-gray-800: 220 10% 80%;
+    --app-gray-900: 220 10% 90%;
+    --app-gray-950: 220 10% 95%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground));
+}
+
+/* Smooth animations */
+* {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Gradient text animation */
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  background-image: linear-gradient(-45deg, #10b981, #059669, #047857, #065f46); /* Using app-green shades */
+  background-size: 400% 400%;
+  animation: gradient 3s ease infinite;
+}
+
+@layer components {
+  .card-hover-effect {
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .card-hover-effect:hover {
+    @apply transform -translate-y-1 shadow-lg;
+  }
+}
