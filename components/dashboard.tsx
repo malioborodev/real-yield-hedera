@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/header'
 import { useToast } from '@/components/ui/use-toast'
+import { WalletService, WalletConnection } from '@/lib/wallet-integration'
 import { OverviewTab } from '@/components/dashboard/overview-tab'
 import { CreateTab } from '@/components/dashboard/create-tab'
 import { MarketplaceTab } from '@/components/dashboard/marketplace-tab'
@@ -25,35 +26,56 @@ import {
 
 // Interface definitions
 interface DashboardProps {
-  accountInfo: any
-  isConnected: boolean
-  invoiceNFTs: any[]
-  auditTrail: any[]
-  onConnectWallet: () => Promise<void>
-  onDisconnectWallet: () => Promise<void>
-  onStakeHBAR: () => Promise<void>
-  stakeAmount: number
-  setStakeAmount: (amount: number) => void
+  // Optional props for backward compatibility
+  accountInfo?: any
+  isConnected?: boolean
+  invoiceNFTs?: any[]
+  auditTrail?: any[]
+  onConnectWallet?: () => Promise<void>
+  onDisconnectWallet?: () => Promise<void>
+  onStakeHBAR?: () => Promise<void>
+  stakeAmount?: number
+  setStakeAmount?: (amount: number) => void
 }
 
 export function Dashboard({
   accountInfo,
   isConnected,
-  invoiceNFTs,
-  auditTrail,
+  invoiceNFTs = [],
+  auditTrail = [],
   onConnectWallet,
   onDisconnectWallet,
   onStakeHBAR,
-  stakeAmount,
+  stakeAmount = 0,
   setStakeAmount
-}: DashboardProps) {
+}: DashboardProps = {}) {
   const [activeTab, setActiveTab] = useState('overview')
   const { toast } = useToast()
+  const [walletConnection, setWalletConnection] = useState<WalletConnection | null>(null)
+  const walletService = new WalletService()
   
-  // Map props to local variables for compatibility
-  const isWalletConnected = isConnected
-  const walletBalance = accountInfo?.balance || 0
-  const stakedBalance = accountInfo?.stakedBalance || 0
+  // Initialize wallet connection
+  useEffect(() => {
+    const checkWalletStatus = async () => {
+      const connection = walletService.getConnection();
+      setWalletConnection(connection);
+    };
+    checkWalletStatus();
+    
+    // Subscribe to wallet events
+    const unsubscribe = walletService.subscribe((connection) => {
+      setWalletConnection(connection);
+    });
+    
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+  
+  // Map wallet connection to local variables for compatibility
+  const isWalletConnected = walletConnection?.isConnected || isConnected || false
+  const walletBalance = walletConnection?.hbarBalance || accountInfo?.balance || 0
+  const stakedBalance = walletConnection?.stakedBalance || accountInfo?.stakedBalance || 0
   
   // Create Tab State
   const [exporter, setExporter] = useState('')
@@ -202,7 +224,12 @@ export function Dashboard({
    const handleStake = async (amount: number) => {
      setStakingStatus('processing')
      try {
-       await onStakeHBAR()
+       if (onStakeHBAR) {
+         await onStakeHBAR()
+       } else {
+         // Use wallet service for staking
+         await walletService.stakeHBAR(amount)
+       }
        setStakingStatus('success')
        setStakingMessage(`Successfully staked ${formatHBAR(amount)}`)
        toast({ title: 'Success', description: `Successfully staked ${formatHBAR(amount)}` })
@@ -348,7 +375,7 @@ export function Dashboard({
             <MarketplaceTab 
               isWalletConnected={isWalletConnected}
               walletBalance={walletBalance}
-              onConnectWallet={onConnectWallet}
+              onConnectWallet={onConnectWallet || (() => walletService.connectWallet('hashpack'))}
               invoices={marketplaceInvoices}
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}

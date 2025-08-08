@@ -1,274 +1,352 @@
-import { 
-  Client, 
-  TopicCreateTransaction, 
-  TopicMessageSubmitTransaction, 
+'use client'
+
+import {
+  Client,
+  TopicCreateTransaction,
+  TopicMessageSubmitTransaction,
+  TopicInfoQuery,
   TopicId,
+  AccountId,
   PrivateKey,
-  AccountId
+  Timestamp
 } from '@hashgraph/sdk'
 
-// Audit event types for HCS logging
-export enum AuditEventType {
-  INVOICE_CREATED = 'INVOICE_CREATED',
-  INVOICE_FUNDED = 'INVOICE_FUNDED', 
-  INVOICE_SETTLED = 'INVOICE_SETTLED',
-  RISK_ASSESSMENT = 'RISK_ASSESSMENT',
-  COLLATERAL_LOCKED = 'COLLATERAL_LOCKED',
-  COLLATERAL_RELEASED = 'COLLATERAL_RELEASED',
-  YIELD_DISTRIBUTED = 'YIELD_DISTRIBUTED'
-}
-
-// HCS Topic IDs for different audit trails
-export const AUDIT_TOPICS = {
-  INVOICE: process.env.NEXT_PUBLIC_HCS_INVOICE_TOPIC || '0.0.123456',
-  FUNDING: process.env.NEXT_PUBLIC_HCS_FUNDING_TOPIC || '0.0.123457', 
-  SETTLEMENT: process.env.NEXT_PUBLIC_HCS_SETTLEMENT_TOPIC || '0.0.123458',
-  RISK: process.env.NEXT_PUBLIC_HCS_RISK_TOPIC || '0.0.123459'
-}
-
-interface AuditEntry {
-  eventType: AuditEventType
+// HCS message types
+interface InvoiceAuditMessage {
+  type: 'INVOICE_CREATED' | 'INVOICE_VERIFIED' | 'INVOICE_TRADED' | 'INVOICE_SETTLED'
+  invoiceId: string
   timestamp: number
-  invoiceId?: string
-  accountId?: string
-  amount?: number
-  metadata?: Record<string, any>
+  data: any
+  signature?: string
 }
 
-class HCSService {
-  private client: Client | null = null
+interface RegionalTopic {
+  topicId: string
+  region: string
+  description: string
+  createdAt: number
+}
+
+interface AuditTrailEntry {
+  sequenceNumber: number
+  consensusTimestamp: string
+  message: InvoiceAuditMessage
+  runningHash: string
+}
+
+export class HederaConsensusService {
+  private client: Client
+  private operatorId: AccountId
+  private operatorKey: PrivateKey
+  private regionalTopics: Map<string, TopicId> = new Map()
+  private mainAuditTopic: TopicId | null = null
 
   constructor() {
-    this.initializeClient()
+    // Initialize Hedera client for testnet
+    this.client = Client.forTestnet()
+    
+    // Set operator (in production, use environment variables)
+    this.operatorId = AccountId.fromString(process.env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID || '0.0.123456')
+    this.operatorKey = PrivateKey.fromString(process.env.HEDERA_PRIVATE_KEY || '302e020100300506032b657004220420...')
+    
+    this.client.setOperator(this.operatorId, this.operatorKey)
+    
+    // Initialize topics
+    this.initializeTopics()
   }
 
-  private initializeClient() {
-    const network = process.env.NEXT_PUBLIC_HEDERA_NETWORK || 'testnet'
-    
-    if (network === 'mainnet') {
-      this.client = Client.forMainnet()
-    } else {
-      this.client = Client.forTestnet()
-    }
-
-    // Set operator if available (for backend operations)
-    // Only set operator in server-side environment
-    if (typeof window === 'undefined') {
-      const operatorId = process.env.HEDERA_OPERATOR_ID
-      const operatorKey = process.env.HEDERA_OPERATOR_KEY
+  private async initializeTopics() {
+    try {
+      // Create main audit topic if not exists
+      if (!this.mainAuditTopic) {
+        this.mainAuditTopic = await this.createTopic('Global Invoice Audit Trail')
+      }
       
-      if (operatorId && operatorKey && this.client) {
-        try {
-          this.client.setOperator(
-            AccountId.fromString(operatorId),
-            PrivateKey.fromString(operatorKey)
-          )
-        } catch (error) {
-          console.warn('Failed to set Hedera operator:', error)
+      // Create regional topics
+      const regions = ['APAC', 'EMEA', 'AMERICAS', 'AFRICA', 'MIDDLE_EAST']
+      for (const region of regions) {
+        if (!this.regionalTopics.has(region)) {
+          const topicId = await this.createTopic(`${region} Regional Invoice Topic`)
+          this.regionalTopics.set(region, topicId)
         }
       }
+    } catch (error) {
+      console.error('Error initializing HCS topics:', error)
     }
   }
 
-  // Create HCS topics for audit logging
-  public async createAuditTopics(): Promise<Record<string, string>> {
-    if (!this.client) {
-      throw new Error('HCS client not initialized')
-    }
-
-    const topics: Record<string, string> = {}
-    
+  private async createTopic(memo: string): Promise<TopicId> {
     try {
-      // Create invoice audit topic
-      const invoiceTopicTx = new TopicCreateTransaction()
-        .setTopicMemo('Real Yield - Invoice Audit Trail')
-        .setSubmitKey(this.client.operatorPublicKey!)
-      
-      const invoiceTopicResponse = await invoiceTopicTx.execute(this.client)
-      const invoiceTopicReceipt = await invoiceTopicResponse.getReceipt(this.client)
-      topics.invoice = invoiceTopicReceipt.topicId!.toString()
+      const transaction = new TopicCreateTransaction()
+        .setTopicMemo(memo)
+        .setAdminKey(this.operatorKey.publicKey)
+        .setSubmitKey(this.operatorKey.publicKey)
+        .freezeWith(this.client)
 
-      // Create funding audit topic
-      const fundingTopicTx = new TopicCreateTransaction()
-        .setTopicMemo('Real Yield - Funding Audit Trail')
-        .setSubmitKey(this.client.operatorPublicKey!)
+      const signedTransaction = await transaction.sign(this.operatorKey)
+      const response = await signedTransaction.execute(this.client)
+      const receipt = await response.getReceipt(this.client)
       
-      const fundingTopicResponse = await fundingTopicTx.execute(this.client)
-      const fundingTopicReceipt = await fundingTopicResponse.getReceipt(this.client)
-      topics.funding = fundingTopicReceipt.topicId!.toString()
-
-      // Create settlement audit topic
-      const settlementTopicTx = new TopicCreateTransaction()
-        .setTopicMemo('Real Yield - Settlement Audit Trail')
-        .setSubmitKey(this.client.operatorPublicKey!)
+      const topicId = receipt.topicId
+      if (!topicId) {
+        throw new Error('Failed to create topic')
+      }
       
-      const settlementTopicResponse = await settlementTopicTx.execute(this.client)
-      const settlementTopicReceipt = await settlementTopicResponse.getReceipt(this.client)
-      topics.settlement = settlementTopicReceipt.topicId!.toString()
-
-      // Create risk audit topic
-      const riskTopicTx = new TopicCreateTransaction()
-        .setTopicMemo('Real Yield - Risk Assessment Audit Trail')
-        .setSubmitKey(this.client.operatorPublicKey!)
-      
-      const riskTopicResponse = await riskTopicTx.execute(this.client)
-      const riskTopicReceipt = await riskTopicResponse.getReceipt(this.client)
-      topics.risk = riskTopicReceipt.topicId!.toString()
-
-      return topics
+      console.log(`Created HCS topic: ${topicId.toString()}`)
+      return topicId
     } catch (error) {
-      console.error('Failed to create HCS topics:', error)
+      console.error('Error creating HCS topic:', error)
       throw error
     }
   }
 
-  // Submit audit entry to appropriate HCS topic
-  public async logAuditEntry(
-    entry: AuditEntry,
-    topicId?: string
+  async submitInvoiceToHCS(
+    invoiceData: any,
+    region: string = 'APAC',
+    messageType: InvoiceAuditMessage['type'] = 'INVOICE_CREATED'
   ): Promise<string> {
-    if (!this.client) {
-      throw new Error('HCS client not initialized')
-    }
-
     try {
-      // Determine topic based on event type if not provided
-      let targetTopicId = topicId
-      if (!targetTopicId) {
-        switch (entry.eventType) {
-          case AuditEventType.INVOICE_CREATED:
-            targetTopicId = AUDIT_TOPICS.INVOICE
-            break
-          case AuditEventType.INVOICE_FUNDED:
-          case AuditEventType.COLLATERAL_LOCKED:
-          case AuditEventType.COLLATERAL_RELEASED:
-            targetTopicId = AUDIT_TOPICS.FUNDING
-            break
-          case AuditEventType.INVOICE_SETTLED:
-          case AuditEventType.YIELD_DISTRIBUTED:
-            targetTopicId = AUDIT_TOPICS.SETTLEMENT
-            break
-          case AuditEventType.RISK_ASSESSMENT:
-            targetTopicId = AUDIT_TOPICS.RISK
-            break
-          default:
-            targetTopicId = AUDIT_TOPICS.INVOICE
+      const message: InvoiceAuditMessage = {
+        type: messageType,
+        invoiceId: invoiceData.id || `INV-${Date.now()}`,
+        timestamp: Date.now(),
+        data: {
+          exporter: invoiceData.exporter,
+          importer: invoiceData.importer,
+          commodity: invoiceData.commodity,
+          faceValue: invoiceData.faceValue,
+          tenor: invoiceData.tenor,
+          estimatedPd: invoiceData.estimatedPd,
+          region: region,
+          hash: this.generateDataHash(invoiceData)
         }
       }
 
-      // Prepare audit message
-      const auditMessage = {
-        ...entry,
-        timestamp: entry.timestamp || Date.now(),
-        version: '1.0'
-      }
-
-      // Submit message to HCS topic
-      const submitTx = new TopicMessageSubmitTransaction()
-        .setTopicId(TopicId.fromString(targetTopicId))
-        .setMessage(JSON.stringify(auditMessage))
-
-      const submitResponse = await submitTx.execute(this.client)
-      const submitReceipt = await submitResponse.getReceipt(this.client)
+      // Submit to both main audit topic and regional topic
+      const mainSubmission = this.submitMessageToTopic(this.mainAuditTopic!, message)
       
-      return submitResponse.transactionId.toString()
+      const regionalTopicId = this.regionalTopics.get(region)
+      const regionalSubmission = regionalTopicId ? 
+        this.submitMessageToTopic(regionalTopicId, message) : 
+        Promise.resolve('No regional topic')
+
+      const [mainResult, regionalResult] = await Promise.all([mainSubmission, regionalSubmission])
+      
+      console.log(`Invoice submitted to HCS - Main: ${mainResult}, Regional: ${regionalResult}`)
+      return mainResult
     } catch (error) {
-      console.error('Failed to log audit entry:', error)
+      console.error('Error submitting invoice to HCS:', error)
       throw error
     }
   }
 
-  // Log invoice creation
-  public async logInvoiceCreation(
-    invoiceId: string,
-    exporterCompany: string,
-    importerCompany: string,
-    faceValue: number,
-    accountId: string
-  ): Promise<string> {
-    const entry: AuditEntry = {
-      eventType: AuditEventType.INVOICE_CREATED,
-      timestamp: Date.now(),
-      invoiceId,
-      accountId,
-      amount: faceValue,
-      metadata: {
-        exporterCompany,
-        importerCompany,
-        faceValue
-      }
-    }
+  private async submitMessageToTopic(topicId: TopicId, message: InvoiceAuditMessage): Promise<string> {
+    try {
+      const messageJson = JSON.stringify(message)
+      const messageBytes = new TextEncoder().encode(messageJson)
 
-    return this.logAuditEntry(entry)
+      const transaction = new TopicMessageSubmitTransaction()
+        .setTopicId(topicId)
+        .setMessage(messageBytes)
+        .freezeWith(this.client)
+
+      const signedTransaction = await transaction.sign(this.operatorKey)
+      const response = await signedTransaction.execute(this.client)
+      const receipt = await response.getReceipt(this.client)
+      
+      return `${topicId.toString()}:${receipt.topicSequenceNumber}`
+    } catch (error) {
+      console.error('Error submitting message to topic:', error)
+      throw error
+    }
   }
 
-  // Log funding event
-  public async logFundingEvent(
-    invoiceId: string,
-    fundingAmount: number,
-    collateralAmount: number,
-    accountId: string
-  ): Promise<string> {
-    const entry: AuditEntry = {
-      eventType: AuditEventType.INVOICE_FUNDED,
-      timestamp: Date.now(),
-      invoiceId,
-      accountId,
-      amount: fundingAmount,
-      metadata: {
-        fundingAmount,
-        collateralAmount
-      }
+  async verifyInvoiceChain(invoiceId: string): Promise<AuditTrailEntry[]> {
+    try {
+      // In production, this would query the Mirror Node API for topic messages
+      // For now, return mock audit trail
+      const mockAuditTrail: AuditTrailEntry[] = [
+        {
+          sequenceNumber: 1,
+          consensusTimestamp: new Date(Date.now() - 86400000).toISOString(),
+          message: {
+            type: 'INVOICE_CREATED',
+            invoiceId,
+            timestamp: Date.now() - 86400000,
+            data: { status: 'created', verified: true }
+          },
+          runningHash: this.generateRunningHash('created', invoiceId)
+        },
+        {
+          sequenceNumber: 2,
+          consensusTimestamp: new Date(Date.now() - 43200000).toISOString(),
+          message: {
+            type: 'INVOICE_VERIFIED',
+            invoiceId,
+            timestamp: Date.now() - 43200000,
+            data: { status: 'verified', riskAssessed: true }
+          },
+          runningHash: this.generateRunningHash('verified', invoiceId)
+        }
+      ]
+      
+      return mockAuditTrail
+    } catch (error) {
+      console.error('Error verifying invoice chain:', error)
+      return []
     }
-
-    return this.logAuditEntry(entry)
   }
 
-  // Log settlement event
-  public async logSettlementEvent(
-    invoiceId: string,
-    settlementAmount: number,
-    yieldAmount: number,
-    accountId: string
-  ): Promise<string> {
-    const entry: AuditEntry = {
-      eventType: AuditEventType.INVOICE_SETTLED,
-      timestamp: Date.now(),
-      invoiceId,
-      accountId,
-      amount: settlementAmount,
-      metadata: {
-        settlementAmount,
-        yieldAmount
+  async getRegionalTopicInfo(region: string): Promise<any> {
+    try {
+      const topicId = this.regionalTopics.get(region)
+      if (!topicId) {
+        throw new Error(`No topic found for region: ${region}`)
       }
-    }
 
-    return this.logAuditEntry(entry)
+      const query = new TopicInfoQuery()
+        .setTopicId(topicId)
+
+      const info = await query.execute(this.client)
+      
+      return {
+        topicId: topicId.toString(),
+        memo: info.topicMemo,
+        sequenceNumber: info.sequenceNumber,
+        adminKey: info.adminKey?.toString(),
+        submitKey: info.submitKey?.toString(),
+        autoRenewPeriod: info.autoRenewPeriod?.seconds
+      }
+    } catch (error) {
+      console.error('Error getting regional topic info:', error)
+      return null
+    }
   }
 
-  // Log risk assessment
-  public async logRiskAssessment(
-    invoiceId: string,
-    riskScore: number,
-    pd: number,
-    accountId: string,
-    assessmentData: Record<string, any>
-  ): Promise<string> {
-    const entry: AuditEntry = {
-      eventType: AuditEventType.RISK_ASSESSMENT,
-      timestamp: Date.now(),
-      invoiceId,
-      accountId,
-      metadata: {
-        riskScore,
-        pd,
-        ...assessmentData
-      }
+  async getInvoiceAuditHistory(invoiceId: string, region?: string): Promise<InvoiceAuditMessage[]> {
+    try {
+      // In production, this would query Mirror Node API
+      // Mock implementation for demonstration
+      const mockHistory: InvoiceAuditMessage[] = [
+        {
+          type: 'INVOICE_CREATED',
+          invoiceId,
+          timestamp: Date.now() - 86400000,
+          data: {
+            exporter: 'Singapore Agri Corp',
+            importer: 'Rotterdam Trading BV',
+            commodity: 'Crude Palm Oil',
+            faceValue: 50000,
+            region: region || 'APAC'
+          }
+        },
+        {
+          type: 'INVOICE_VERIFIED',
+          invoiceId,
+          timestamp: Date.now() - 43200000,
+          data: {
+            verificationStatus: 'passed',
+            riskScore: 0.4,
+            verifiedBy: 'AI Risk Engine'
+          }
+        }
+      ]
+      
+      return mockHistory
+    } catch (error) {
+      console.error('Error getting invoice audit history:', error)
+      return []
     }
+  }
 
-    return this.logAuditEntry(entry)
+  async submitTradeEvent(invoiceId: string, tradeData: any): Promise<string> {
+    try {
+      const message: InvoiceAuditMessage = {
+        type: 'INVOICE_TRADED',
+        invoiceId,
+        timestamp: Date.now(),
+        data: {
+          buyer: tradeData.buyer,
+          seller: tradeData.seller,
+          tradePrice: tradeData.tradePrice,
+          tradeTimestamp: tradeData.timestamp,
+          transactionHash: tradeData.transactionHash
+        }
+      }
+
+      return await this.submitMessageToTopic(this.mainAuditTopic!, message)
+    } catch (error) {
+      console.error('Error submitting trade event:', error)
+      throw error
+    }
+  }
+
+  async submitSettlementEvent(invoiceId: string, settlementData: any): Promise<string> {
+    try {
+      const message: InvoiceAuditMessage = {
+        type: 'INVOICE_SETTLED',
+        invoiceId,
+        timestamp: Date.now(),
+        data: {
+          settledAmount: settlementData.amount,
+          settledBy: settlementData.settledBy,
+          settlementDate: settlementData.date,
+          collateralReleased: settlementData.collateralReleased
+        }
+      }
+
+      return await this.submitMessageToTopic(this.mainAuditTopic!, message)
+    } catch (error) {
+      console.error('Error submitting settlement event:', error)
+      throw error
+    }
+  }
+
+  private generateDataHash(data: any): string {
+    // Simple hash generation for demonstration
+    // In production, use proper cryptographic hashing
+    const jsonString = JSON.stringify(data)
+    let hash = 0
+    for (let i = 0; i < jsonString.length; i++) {
+      const char = jsonString.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(16)
+  }
+
+  private generateRunningHash(action: string, invoiceId: string): string {
+    // Simple running hash for demonstration
+    const combined = `${action}-${invoiceId}-${Date.now()}`
+    return this.generateDataHash(combined)
+  }
+
+  // Utility methods
+  getMainAuditTopicId(): string | null {
+    return this.mainAuditTopic?.toString() || null
+  }
+
+  getRegionalTopicId(region: string): string | null {
+    const topicId = this.regionalTopics.get(region)
+    return topicId?.toString() || null
+  }
+
+  getAllRegionalTopics(): RegionalTopic[] {
+    const topics: RegionalTopic[] = []
+    this.regionalTopics.forEach((topicId, region) => {
+      topics.push({
+        topicId: topicId.toString(),
+        region,
+        description: `${region} Regional Invoice Topic`,
+        createdAt: Date.now() - Math.random() * 86400000
+      })
+    })
+    return topics
   }
 }
 
-export const hcsService = new HCSService()
-export default hcsService
+// Export singleton instance
+export const hcsService = new HederaConsensusService()
+
+// Export types for use in other files
+export type { InvoiceAuditMessage, RegionalTopic, AuditTrailEntry }

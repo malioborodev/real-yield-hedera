@@ -14,58 +14,43 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { hederaWallet } from '@/lib/hedera-wallet-mock' // Import the mock wallet service
+import { WalletService, WalletConnection } from '@/lib/wallet-integration'
 
 export function Header({ showNav = true, showCreateInvoice = true }: { showNav?: boolean; showCreateInvoice?: boolean }) {
-  const [isConnected, setIsConnected] = useState(false)
-  const [accountId, setAccountId] = useState('0.0.000000') // Default to empty
-  const [balance, setBalance] = useState(0) // Default to 0
-  const [walletType, setWalletType] = useState('N/A')
+  const [walletConnection, setWalletConnection] = useState<WalletConnection | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
+  const walletService = new WalletService()
 
   useEffect(() => {
     const checkWalletStatus = async () => {
-      const info = hederaWallet.getAccountInfo();
-      if (info) {
-        setIsConnected(true);
-        setAccountId(info.accountId);
-        setBalance(info.balance);
-        setWalletType(info.walletType);
-      } else {
-        setIsConnected(false);
-        setAccountId('0.0.000000');
-        setBalance(0);
-        setWalletType('N/A');
-      }
+      const connection = walletService.getConnection();
+      setWalletConnection(connection);
     };
     checkWalletStatus();
-    // Optionally, set up an interval to periodically check status if needed
-    const interval = setInterval(checkWalletStatus, 5000); // Check every 5 seconds
-    return () => clearInterval(interval);
+    
+    // Subscribe to wallet events
+    const unsubscribe = walletService.subscribe((connection) => {
+      setWalletConnection(connection);
+    });
+    
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const handleConnectWallet = async () => {
     setIsConnecting(true);
-    if (!isConnected) {
+    if (!walletConnection?.isConnected) {
       try {
-        const info = await hederaWallet.connect();
-        setIsConnected(true);
-        setAccountId(info.accountId);
-        setBalance(info.balance);
-        setWalletType(info.walletType);
+        await walletService.connectWallet('hashpack'); // Default to HashPack
       } catch (error) {
         console.error('Failed to connect wallet:', error);
-        // Handle error in UI, e.g., show a toast
       } finally {
         setIsConnecting(false);
       }
     } else {
       try {
-        await hederaWallet.disconnect();
-        setIsConnected(false);
-        setAccountId('0.0.000000');
-        setBalance(0);
-        setWalletType('N/A');
+        await walletService.disconnectWallet();
       } catch (error) {
         console.error('Failed to disconnect wallet:', error);
       } finally {
@@ -75,8 +60,10 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
   }
 
   const copyAccountId = () => {
-    navigator.clipboard.writeText(accountId)
-    // In a real app, you'd show a toast notification here
+    if (walletConnection?.accountId) {
+      navigator.clipboard.writeText(walletConnection.accountId)
+      // In a real app, you'd show a toast notification here
+    }
   }
 
   const formatHBAR = (value: number) => {
@@ -95,7 +82,7 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
               <div>
                 <h1 className="text-2xl font-bold text-app-gray-900 dark:text-app-gray-50">RealYield</h1>
                 <p className="text-sm text-app-gray-600 dark:text-app-gray-400">
-                  Hedera-native invoice factoring • Account: <span className="font-mono font-semibold">{accountId === '0.0.000000' ? 'Not Connected' : accountId}</span>
+                  Hedera-native invoice factoring • Account: <span className="font-mono font-semibold">{!walletConnection?.isConnected ? 'Not Connected' : walletConnection.accountId}</span>
                 </p>
               </div>
             </div>
@@ -121,14 +108,14 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
             )}
 
             <div className="flex items-center space-x-3">
-              <Badge className={`text-xs font-medium px-2 py-1 rounded-full ${isConnected ? 'bg-app-green-100 text-app-green-700 border border-app-green-200 dark:bg-app-green-900 dark:text-app-green-200' : 'bg-app-red-100 text-app-red-700 border border-app-red-200 dark:bg-app-red-900 dark:text-app-red-200'}`}>
-                {isConnected ? <CheckCircle className="w-3 h-3 mr-1" /> : <Circle className="w-3 h-3 mr-1 fill-app-red-500 text-app-red-500" />}
-                {isConnected ? 'Connected' : 'Disconnected'}
+              <Badge className={`text-xs font-medium px-2 py-1 rounded-full ${walletConnection?.isConnected ? 'bg-app-green-100 text-app-green-700 border border-app-green-200 dark:bg-app-green-900 dark:text-app-green-200' : 'bg-app-red-100 text-app-red-700 border border-app-red-200 dark:bg-app-red-900 dark:text-app-red-200'}`}>
+                {walletConnection?.isConnected ? <CheckCircle className="w-3 h-3 mr-1" /> : <Circle className="w-3 h-3 mr-1 fill-app-red-500 text-app-red-500" />}
+                {walletConnection?.isConnected ? 'Connected' : 'Disconnected'}
               </Badge>
-              {isConnected && (
+              {walletConnection?.isConnected && (
                 <Badge variant="outline" className="text-xs font-medium px-2 py-1 rounded-full border-app-blue-200 text-app-blue-600 dark:border-app-blue-700 dark:text-app-blue-400">
                   <Circle className="w-2 h-2 mr-1 fill-app-blue-500 text-app-blue-500" />
-                  {walletType}
+                  {walletConnection.walletType}
                 </Badge>
               )}
               <span className="text-xs text-app-green-600 flex items-center dark:text-app-green-400">
@@ -149,9 +136,9 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
             {/* Wallet Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className={`relative hover:bg-app-gray-100 dark:hover:bg-app-gray-800 ${isConnected ? 'text-app-green-600 dark:text-app-green-400' : 'text-app-gray-600 dark:text-app-gray-400'}`}>
+                <Button variant="ghost" size="icon" className={`relative hover:bg-app-gray-100 dark:hover:bg-app-gray-800 ${walletConnection?.isConnected ? 'text-app-green-600 dark:text-app-green-400' : 'text-app-gray-600 dark:text-app-gray-400'}`}>
                   <Wallet className="w-5 h-5" />
-                  {isConnected && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-app-green-500 ring-2 ring-white dark:ring-app-gray-900" />}
+                  {walletConnection?.isConnected && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-app-green-500 ring-2 ring-white dark:ring-app-gray-900" />}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80 p-2 shadow-lg rounded-lg bg-white dark:bg-app-gray-800 border border-app-gray-200 dark:border-app-gray-700">
@@ -159,13 +146,13 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
                   <div className="flex flex-col space-y-1">
                     <p className="text-base leading-none">Hedera Wallet</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {isConnected ? `Connected via ${walletType}` : 'Not connected'}
+                      {walletConnection?.isConnected ? `Connected via ${walletConnection.walletType}` : 'Not connected'}
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="my-2 bg-app-gray-200 dark:bg-app-gray-700" />
                 
-                {isConnected ? (
+                {walletConnection?.isConnected ? (
                   <>
                     <DropdownMenuItem className="flex flex-col items-start p-3 cursor-default hover:bg-transparent focus:bg-transparent">
                       <div className="flex items-center justify-between w-full mb-1">
@@ -174,12 +161,12 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
-                      <span className="font-mono text-xs text-app-gray-600 dark:text-app-gray-400 bg-app-gray-50 dark:bg-app-gray-900 p-1 rounded w-full break-all">{accountId}</span>
+                      <span className="font-mono text-xs text-app-gray-600 dark:text-app-gray-400 bg-app-gray-50 dark:bg-app-gray-900 p-1 rounded w-full break-all">{walletConnection.accountId}</span>
                     </DropdownMenuItem>
                     
                     <DropdownMenuItem className="flex flex-col items-start p-3 cursor-default hover:bg-transparent focus:bg-transparent">
                       <span className="text-sm font-medium text-app-gray-700 dark:text-app-gray-300 mb-1">Balance</span>
-                      <span className="text-xl font-bold text-app-green-600 dark:text-app-green-400">{formatHBAR(balance)}</span>
+                      <span className="text-xl font-bold text-app-green-600 dark:text-app-green-400">{formatHBAR(walletConnection.hbarBalance)}</span>
                     </DropdownMenuItem>
                     
                     <DropdownMenuSeparator className="my-2 bg-app-gray-200 dark:bg-app-gray-700" />
@@ -225,7 +212,7 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
               <Settings className="w-5 h-5 text-app-gray-600 dark:text-app-gray-400" />
             </Button>
             {showCreateInvoice && (
-              <Button className="bg-app-green-600 hover:bg-app-green-700 text-white px-4 py-2 rounded-md shadow-sm" disabled={!isConnected}>
+              <Button className="bg-app-green-600 hover:bg-app-green-700 text-white px-4 py-2 rounded-md shadow-sm" disabled={!walletConnection?.isConnected}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Invoice
               </Button>
