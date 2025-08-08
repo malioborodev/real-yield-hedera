@@ -47,7 +47,13 @@ export class HederaConsensusService {
     
     // Set operator (in production, use environment variables)
     this.operatorId = AccountId.fromString(process.env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID || '0.0.123456')
-    this.operatorKey = PrivateKey.fromString(process.env.HEDERA_PRIVATE_KEY || '302e020100300506032b657004220420...')
+    
+    // Validate private key length before parsing
+    const privateKeyString = process.env.HEDERA_PRIVATE_KEY || '302e020100300506032b657004220420a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456'
+    if (privateKeyString.length < 64) {
+      throw new Error('Invalid private key: must be at least 64 characters long')
+    }
+    this.operatorKey = PrivateKey.fromString(privateKeyString)
     
     this.client.setOperator(this.operatorId, this.operatorKey)
     
