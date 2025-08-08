@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,7 @@ interface Invoice {
   country: string
   status: 'available' | 'pending' | 'sold'
   createdAt: string
+  image?: string
 }
 
 interface MarketplaceTabProps {
@@ -103,6 +105,22 @@ export function MarketplaceTab({
     if (pd <= 1) return 'text-app-green-600 dark:text-app-green-400'
     if (pd <= 3) return 'text-app-yellow-600 dark:text-app-yellow-400'
     return 'text-app-red-600 dark:text-app-red-400'
+  }
+
+  const getCommodityImage = (commodity: string) => {
+    const imageMap: { [key: string]: string } = {
+      'Crude Palm Oil': '/images/commodities/palm-oil.png',
+      'Arabica Coffee Beans': '/images/commodities/coffee-beans.png',
+      'Natural Rubber RSS3': '/images/commodities/rubber-tree.png',
+      'Cocoa Beans': '/images/commodities/cocoa-beans.png',
+      'Jasmine Rice': '/images/commodities/jasmine-rice.png',
+      'Black Pepper': '/images/commodities/black-pepper.png',
+      'Coconut Oil': '/images/commodities/coconut-oil.png',
+      'Vanilla Beans': '/images/commodities/vanilla-beans.png',
+      'Cloves': '/images/commodities/cloves.png',
+      'Nutmeg': '/images/commodities/nutmeg.png'
+    }
+    return imageMap[commodity] || '/images/commodities/palm-oil.png'
   }
 
   return (
@@ -234,6 +252,20 @@ export function MarketplaceTab({
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Commodity Image */}
+              <div className="relative w-full h-32 bg-app-gray-100 dark:bg-app-gray-700 rounded-lg overflow-hidden">
+                <Image
+                  src={invoice.image || getCommodityImage(invoice.commodity)}
+                  alt={invoice.commodity}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
+                  {invoice.commodity}
+                </div>
+              </div>
               {/* Company Info */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm">

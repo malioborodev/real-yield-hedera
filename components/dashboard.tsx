@@ -8,6 +8,7 @@ import { OverviewTab } from '@/components/dashboard/overview-tab'
 import { CreateTab } from '@/components/dashboard/create-tab'
 import { MarketplaceTab } from '@/components/dashboard/marketplace-tab'
 import { PortfolioTab } from '@/components/dashboard/portfolio-tab'
+import { SettleTab } from '@/components/dashboard/settle-tab'
 import {
   kpiData,
   riskDistribution,
@@ -75,6 +76,12 @@ export function Dashboard({
   const [stakingMessage, setStakingMessage] = useState('')
   const [totalInvoiceValueForStake, setTotalInvoiceValueForStake] = useState<number | ''>('')
   const [calculatedRequiredStake, setCalculatedRequiredStake] = useState<number | null>(null)
+  
+  // Settle Tab State
+  const [settleStatus, setSettleStatus] = useState<'idle' | 'settling' | 'success' | 'error'>('idle')
+  const [settleMessage, setSettleMessage] = useState('')
+  const [claimStatus, setClaimStatus] = useState<'idle' | 'claiming' | 'success' | 'error'>('idle')
+  const [claimMessage, setClaimMessage] = useState('')
   
   // Marketplace Tab State
   const [searchTerm, setSearchTerm] = useState('')
@@ -231,6 +238,34 @@ export function Dashboard({
    const handleDownloadReport = () => {
      toast({ title: 'Info', description: 'Downloading portfolio report...' })
    }
+   
+   const handleSettleInvoice = async (invoiceId: string) => {
+     setSettleStatus('settling')
+     try {
+       await new Promise(resolve => setTimeout(resolve, 2000))
+       setSettleStatus('success')
+       setSettleMessage(`Successfully initiated settlement for invoice ${invoiceId}`)
+       toast({ title: 'Success', description: `Settlement initiated for invoice ${invoiceId}` })
+     } catch (error) {
+       setSettleStatus('error')
+       setSettleMessage('Failed to initiate settlement')
+       toast({ title: 'Error', description: 'Failed to initiate settlement', variant: 'destructive' })
+     }
+   }
+   
+   const handleClaimReturns = async (invoiceId: string) => {
+     setClaimStatus('claiming')
+     try {
+       await new Promise(resolve => setTimeout(resolve, 1500))
+       setClaimStatus('success')
+       setClaimMessage(`Successfully claimed returns for invoice ${invoiceId}`)
+       toast({ title: 'Success', description: `Returns claimed for invoice ${invoiceId}` })
+     } catch (error) {
+       setClaimStatus('error')
+       setClaimMessage('Failed to claim returns')
+       toast({ title: 'Error', description: 'Failed to claim returns', variant: 'destructive' })
+     }
+   }
 
   return (
     <div className="min-h-screen bg-app-gray-50 text-app-gray-900 dark:bg-app-gray-950 dark:text-app-50">
@@ -239,24 +274,24 @@ export function Dashboard({
       {/* Navigation Tabs */}
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-          <TabsList className="grid w-full grid-cols-4 bg-app-gray-100/80 dark:bg-app-gray-800/80 border border-app-gray-200 dark:border-app-gray-700 shadow-sm rounded-lg p-1">
+          <TabsList className="grid w-full grid-cols-5 bg-app-gray-100/80 dark:bg-app-gray-800/80 border border-app-gray-200 dark:border-app-gray-700 shadow-sm rounded-lg p-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-app-green-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold rounded-md transition-all duration-200 text-app-gray-700 dark:text-app-gray-300 hover:text-app-green-600 dark:hover:text-app-green-400">Overview</TabsTrigger>
             <TabsTrigger value="create" className="data-[state=active]:bg-app-green-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold rounded-md transition-all duration-200 text-app-gray-700 dark:text-app-gray-300 hover:text-app-green-600 dark:hover:text-app-green-400">Create</TabsTrigger>
             <TabsTrigger value="market" className="data-[state=active]:bg-app-green-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold rounded-md transition-all duration-200 text-app-gray-700 dark:text-app-gray-300 hover:text-app-green-600 dark:hover:text-app-green-400">Market</TabsTrigger>
             <TabsTrigger value="portfolio" className="data-[state=active]:bg-app-green-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold rounded-md transition-all duration-200 text-app-gray-700 dark:text-app-gray-300 hover:text-app-green-600 dark:hover:text-app-green-400">Portfolio</TabsTrigger>
+            <TabsTrigger value="settle" className="data-[state=active]:bg-app-green-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:font-semibold rounded-md transition-all duration-200 text-app-gray-700 dark:text-app-gray-300 hover:text-app-green-600 dark:hover:text-app-green-400">Settle</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-8">
             <OverviewTab 
-              isWalletConnected={isWalletConnected}
-              walletBalance={walletBalance}
-              stakedBalance={stakedBalance}
-              onConnectWallet={onConnectWallet}
-              onDisconnectWallet={onDisconnectWallet}
+              currentTVL={kpiData[kpiData.length - 1].tvl}
+              currentYield={kpiData[kpiData.length - 1].yield}
+              insurancePool={kpiData[kpiData.length - 1].insurancePool}
               kpiData={kpiData}
               riskDistribution={riskDistribution}
               topInvoices={topInvoices}
               liveTrades={liveTrades}
+              categoryData={categoryData}
               formatCurrency={formatCurrency}
               formatHBAR={formatHBAR}
               getRiskColor={getRiskColor}
@@ -264,7 +299,7 @@ export function Dashboard({
           </TabsContent>
 
           <TabsContent value="create" className="space-y-8">
-            <CreateTab 
+            <CreateTab
               isWalletConnected={isWalletConnected}
               walletBalance={walletBalance}
               stakedBalance={stakedBalance}
@@ -294,19 +329,18 @@ export function Dashboard({
               releaseMessage={releaseMessage}
               stakingStatus={stakingStatus}
               stakingMessage={stakingMessage}
-              stakeAmount={stakeAmount}
-              setStakeAmount={setStakeAmount}
               totalInvoiceValueForStake={totalInvoiceValueForStake}
               setTotalInvoiceValueForStake={setTotalInvoiceValueForStake}
               calculatedRequiredStake={calculatedRequiredStake}
               missingHbarForCollateral={missingHbarForCollateral}
               missingHbarForCalculatedStake={missingHbarForCalculatedStake}
-              onCalculateYield={handleCalculateYield}
-              onMintNFT={handleMintNFT}
-              onReleaseCollateral={handleReleaseCollateral}
-              onStake={handleStake}
+              handleCalculateYield={handleCalculateYield}
+              handleMintNFT={handleMintNFT}
+              handleReleaseCollateral={handleReleaseCollateral}
+              handleStake={handleStake}
               formatCurrency={formatCurrency}
               formatHBAR={formatHBAR}
+              calculateRealYield={calculateRealYield}
             />
           </TabsContent>
 
@@ -347,6 +381,22 @@ export function Dashboard({
               categoryData={categoryData}
               onViewInvoiceDetails={handleViewInvoiceDetails}
               onDownloadReport={handleDownloadReport}
+              formatCurrency={formatCurrency}
+              formatHBAR={formatHBAR}
+              getRiskColor={getRiskColor}
+            />
+          </TabsContent>
+
+          <TabsContent value="settle" className="space-y-8">
+            <SettleTab 
+              isWalletConnected={isWalletConnected}
+              walletBalance={walletBalance}
+              stakedBalance={stakedBalance}
+              maturedInvoices={[]}
+              pendingSettlements={[]}
+              settledInvoices={[]}
+              onSettleInvoice={handleSettleInvoice}
+              onClaimReturns={handleClaimReturns}
               formatCurrency={formatCurrency}
               formatHBAR={formatHBAR}
               getRiskColor={getRiskColor}

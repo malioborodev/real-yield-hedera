@@ -5,9 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'RealYield App',
-  description: 'Hedera-native invoice factoring platform',
-    generator: 'v0.dev'
+  title: 'Real Yield - Hedera Invoice Factoring',
+  description: 'Decentralized invoice factoring platform powered by Hedera Hashgraph. Fixed-price sales, transparent fees, and real yield from actual settlements.'
 }
 
 export default function RootLayout({
