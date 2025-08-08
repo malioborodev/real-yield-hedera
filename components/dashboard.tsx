@@ -11,8 +11,8 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 import Image from 'next/image'
 import { Header } from '@/components/header'
 
-// Add import for hederaWallet mock service
-import { hederaWallet } from '@/lib/hedera-wallet-mock'
+// Add import for Hedera services
+import { useToast } from '@/components/ui/use-toast'
 
 // Enhanced mock data with Real Yield Formula
 const kpiData = [
@@ -241,15 +241,56 @@ const categoryData = [
   { name: 'Others', value: 5, amount: 1800000, color: '#6B7280' },
 ]
 
+// Dashboard component props interface
+interface DashboardProps {
+  accountInfo: any
+  isConnected: boolean
+  invoiceNFTs: any[]
+  auditTrail: any[]
+  onConnectWallet: () => Promise<void>
+  onDisconnectWallet: () => Promise<void>
+  onStakeHBAR: () => Promise<void>
+  stakeAmount: number
+  setStakeAmount: (amount: number) => void
+}
+
 // Update the Dashboard component's state and logic
-export function Dashboard() {
+export function Dashboard({
+  accountInfo,
+  isConnected,
+  invoiceNFTs,
+  auditTrail,
+  onConnectWallet,
+  onDisconnectWallet,
+  onStakeHBAR,
+  stakeAmount,
+  setStakeAmount
+}: DashboardProps) {
   const [activeTab, setActiveTab] = useState('overview')
   const [currentTVL, setCurrentTVL] = useState(58000000)
   const [currentYield, setCurrentYield] = useState(19.3)
   const [insurancePool, setInsurancePool] = useState(116000)
-  const [isWalletConnected, setIsWalletConnected] = useState(false)
-  const [walletBalance, setWalletBalance] = useState(0)
-  const [stakedBalance, setStakedBalance] = useState(0) // New state for staked balance
+  const { toast } = useToast()
+  
+  // Map props to local variables for compatibility
+  const isWalletConnected = isConnected
+  const walletBalance = accountInfo?.balance || 0
+  const stakedBalance = accountInfo?.stakedBalance || 0
+  
+  // Mock hederaWallet object for compatibility
+  const hederaWallet = {
+    createInvoiceTransaction: async (data: any, metadata: any, collateral: any) => {
+      // This would be handled by parent component
+      return { success: true, txId: 'mock-tx-id', message: 'Transaction successful' }
+    },
+    releaseCollateralTransaction: async (invoiceId: any, amount: any) => {
+      return { success: true, txId: 'mock-tx-id', message: 'Collateral released' }
+    },
+    stakeHBAR: async (amount: number) => {
+      await onStakeHBAR()
+      return { success: true, txId: 'mock-tx-id', message: 'HBAR staked successfully' }
+    }
+  }
 
   // Form states for Create tab
   const [exporter, setExporter] = useState('')
@@ -293,25 +334,9 @@ export function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  // Check wallet connection status and balances from mock service
+  // Wallet connection and balance updates are handled by parent component
   useEffect(() => {
-    const updateWalletStatus = async () => {
-      const connected = hederaWallet.isConnected();
-      setIsWalletConnected(connected);
-      if (connected) {
-        const info = hederaWallet.getAccountInfo();
-        if (info) {
-          setWalletBalance(info.balance);
-          setStakedBalance(info.stakedBalance); // Update staked balance
-        }
-      } else {
-        setWalletBalance(0);
-        setStakedBalance(0); // Reset staked balance
-      }
-    };
-    updateWalletStatus();
-    const interval = setInterval(updateWalletStatus, 2000); // Update every 2 seconds
-    return () => clearInterval(interval);
+    // All wallet state is managed by parent component through props
   }, []);
 
   // Calculate required stake based on total invoice value
@@ -804,7 +829,7 @@ export function Dashboard() {
                         paddingAngle={5}
                         dataKey="value"
                         labelLine={false}
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                       >
                         {riskDistribution.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -824,14 +849,16 @@ export function Dashboard() {
                   </ResponsiveContainer>
                   <div className="space-y-2 mt-4">
                     {riskDistribution.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between text-sm">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="text-app-gray-700 dark:text-app-gray-300">{item.name}</span>
+                      <div key={index} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="text-app-gray-700 dark:text-app-gray-300">{item.name}</span>
+                        </div>
+                        <span className="text-app-gray-500 dark:text-app-gray-400">{item.description}</span>
                       </div>
-                      <span className="text-app-gray-500 dark:text-app-gray-400">{item.description}</span>
                     ))}
                   </div>
                 </CardContent>
@@ -1171,7 +1198,7 @@ export function Dashboard() {
                     className="flex-1 bg-app-blue-600 hover:bg-app-blue-700 text-white py-2 rounded-md shadow-sm"
                     onClick={handleMintNFT}
                     disabled={
-                      mintingStatus !== 'calculated' || 
+                      (mintingStatus !== 'calculated' && mintingStatus !== 'minting') || 
                       mintingStatus === 'minting' || 
                       !isWalletConnected || 
                       requiredHbarCollateral === null ||
