@@ -13,6 +13,8 @@ import { Header } from '@/components/header'
 
 // Add import for Hedera services
 import { useToast } from '@/components/ui/use-toast'
+import { mirrorNodeService } from '@/lib/mirror-node'
+import type { NFTInfo, InvoiceNFTMetadata, TopicMessage } from '@/lib/mirror-node'
 
 // Enhanced mock data with Real Yield Formula
 const kpiData = [
@@ -247,7 +249,7 @@ interface DashboardProps {
   isConnected: boolean
   invoiceNFTs: any[]
   auditTrail: any[]
-  onConnectWallet: () => Promise<void>
+  onConnectWallet: () => void
   onDisconnectWallet: () => Promise<void>
   onStakeHBAR: () => Promise<void>
   stakeAmount: number
@@ -272,10 +274,85 @@ export function Dashboard({
   const [insurancePool, setInsurancePool] = useState(116000)
   const { toast } = useToast()
   
+  // Real data states
+  const [realInvoiceNFTs, setRealInvoiceNFTs] = useState<Array<NFTInfo & { parsedMetadata?: InvoiceNFTMetadata }>>([])
+  const [realAuditTrail, setRealAuditTrail] = useState<TopicMessage[]>([])
+  const [realPortfolioData, setRealPortfolioData] = useState<any[]>([])
+  const [isLoadingRealData, setIsLoadingRealData] = useState(false)
+  const [useRealData, setUseRealData] = useState(false)
+  
   // Map props to local variables for compatibility
   const isWalletConnected = isConnected
   const walletBalance = accountInfo?.balance || 0
   const stakedBalance = accountInfo?.stakedBalance || 0
+  
+  // Fetch real data from Hedera network
+  useEffect(() => {
+    const fetchRealData = async () => {
+      if (!isWalletConnected || !accountInfo?.accountId) return
+      
+      setIsLoadingRealData(true)
+      try {
+        // Fetch real invoice NFTs
+        const nfts = await mirrorNodeService.getInvoiceNFTs(accountInfo.accountId)
+        setRealInvoiceNFTs(nfts)
+        
+        // Fetch audit trail for user's invoices
+        const auditMessages: TopicMessage[] = []
+        for (const nft of nfts) {
+          if (nft.parsedMetadata?.invoiceId) {
+            const messages = await mirrorNodeService.getInvoiceAuditTrail(nft.parsedMetadata.invoiceId)
+            auditMessages.push(...messages)
+          }
+        }
+        setRealAuditTrail(auditMessages)
+        
+        // Convert NFTs to portfolio data
+        const portfolio = nfts.map(nft => {
+          const metadata = nft.parsedMetadata
+          if (!metadata) return null
+          
+          return {
+            id: metadata.invoiceId,
+            commodity: metadata.commodity,
+            invested: metadata.faceValue * 0.9, // Assuming 90% funding
+            currentValue: metadata.faceValue,
+            faceValue: metadata.faceValue,
+            pd: metadata.pd,
+            tenor: metadata.tenor,
+            daysLeft: Math.max(0, metadata.tenor - Math.floor((Date.now() - new Date(metadata.createdAt).getTime()) / (1000 * 60 * 60 * 24))),
+            status: metadata.status,
+            profitEarned: metadata.status === 'settled' ? metadata.faceValue * 0.1 : 0,
+            destination: 'Unknown',
+            htsTokenId: nft.token_id
+          }
+        }).filter(Boolean)
+        
+        setRealPortfolioData(portfolio)
+        
+        // Enable real data mode if we have data
+        if (nfts.length > 0) {
+          setUseRealData(true)
+          toast({
+            title: "Real Data Loaded",
+            description: `Found ${nfts.length} invoice NFTs in your account`,
+          })
+        }
+        
+      } catch (error) {
+        console.error('Failed to fetch real data:', error)
+        toast({
+          title: "Failed to Load Real Data",
+          description: "Using demo data instead. Connect your wallet with invoice NFTs to see real data.",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoadingRealData(false)
+      }
+    }
+    
+    fetchRealData()
+  }, [isWalletConnected, accountInfo?.accountId, toast])
   
   // Mock hederaWallet object for compatibility
   const hederaWallet = {
@@ -657,6 +734,40 @@ export function Dashboard({
               </Card>
             </div>
 
+            {/* Data Source Toggle */}
+            <Card className="bg-white dark:bg-app-gray-800 border-app-gray-200 dark:border-app-gray-700 shadow-sm rounded-lg mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-app-gray-900 dark:text-app-gray-50 flex items-center">
+                      <Zap className="w-5 h-5 mr-2 text-app-green-600" />
+                      Data Source
+                    </CardTitle>
+                    <CardDescription className="text-app-gray-700 dark:text-app-gray-300">
+                      {useRealData ? 'Live data from Hedera network' : 'Demo data for testing'}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    {isLoadingRealData && (
+                      <div className="flex items-center text-app-blue-500">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Loading real data...
+                      </div>
+                    )}
+                    <Button
+                      variant={useRealData ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setUseRealData(!useRealData)}
+                      disabled={isLoadingRealData}
+                      className={useRealData ? "bg-app-green-600 hover:bg-app-green-700" : ""}
+                    >
+                      {useRealData ? 'Real Data' : 'Mock Data'}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+
             {/* Real Yield Formula Explanation */}
             <Card className="bg-gradient-to-r from-app-green-50 to-app-blue-50 dark:from-app-gray-800 dark:to-app-gray-900 border-app-green-200 dark:border-app-gray-700 shadow-md rounded-xl">
               <CardHeader>
@@ -877,7 +988,16 @@ export function Dashboard({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {liveTrades.map((trade, index) => (
+                    {(useRealData && realAuditTrail.length > 0 ? realAuditTrail.slice(0, 6).map((msg, index) => ({
+                       type: 'funded',
+                       user: msg.payer_account_id || '0.0.unknown',
+                       amount: 50000,
+                       invoice: `Topic-${msg.topic_id}`,
+                       time: new Date(Number(msg.consensus_timestamp) * 1000).toLocaleString(),
+                       irr: 18.5,
+                       destination: 'Network',
+                       hbarFee: 0.001
+                     })) : liveTrades).map((trade, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-app-gray-100 dark:bg-app-gray-900 rounded-lg border border-app-gray-200 dark:border-app-gray-700">
                         <div className={`w-2 h-2 rounded-full ${
                           trade.type === 'funded' ? 'bg-app-blue-500' :
@@ -1260,8 +1380,8 @@ export function Dashboard({
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {topInvoices.map((invoice, index) => {
-                const calc = calculateRealYield(invoice.faceValue, invoice.pd, invoice.tenor)
+              {(useRealData && realPortfolioData.length > 0 ? realPortfolioData.slice(0, 8) : topInvoices).map((invoice, index) => {
+                const calc = calculateRealYield(invoice.faceValue, invoice.pd || 0.15, invoice.tenor || 30)
                 return (
                   <Card key={index} className="bg-white dark:bg-app-gray-800 border-app-gray-200 dark:border-app-gray-700 shadow-sm rounded-xl overflow-hidden card-hover-effect">
                     <div className="relative h-48">
@@ -1365,9 +1485,9 @@ export function Dashboard({
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-app-gray-900 dark:text-app-gray-50">
-                    {formatCurrency(portfolioData.reduce((sum, item) => sum + item.invested, 0))}
+                    {formatCurrency((useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).reduce((sum, item) => sum + item.invested, 0))}
                   </div>
-                  <p className="text-xs text-app-gray-500 dark:text-app-gray-400">Across {portfolioData.length} positions</p>
+                  <p className="text-xs text-app-gray-500 dark:text-app-gray-400">Across {(useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).length} positions</p>
                 </CardContent>
               </Card>
               <Card className="bg-white dark:bg-app-gray-800 border-app-gray-200 dark:border-app-gray-700 shadow-sm rounded-xl card-hover-effect">
@@ -1376,10 +1496,10 @@ export function Dashboard({
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-app-gray-900 dark:text-app-gray-50">
-                    {formatCurrency(portfolioData.reduce((sum, item) => sum + item.currentValue, 0))}
+                    {formatCurrency((useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).reduce((sum, item) => sum + item.currentValue, 0))}
                   </div>
                   <p className="text-xs text-app-green-500 dark:text-app-green-400">
-                    +{(((portfolioData.reduce((sum, item) => sum + item.currentValue, 0) / portfolioData.reduce((sum, item) => sum + item.invested, 0)) - 1) * 100).toFixed(1)}% unrealized
+                    +{(((((useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).reduce((sum, item) => sum + item.currentValue, 0) / (useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).reduce((sum, item) => sum + item.invested, 0)) - 1) * 100) || 0).toFixed(1)}% unrealized
                   </p>
                 </CardContent>
               </Card>
@@ -1389,7 +1509,7 @@ export function Dashboard({
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-app-green-600">
-                    {formatCurrency(portfolioData.filter(item => item.status === 'Settled').reduce((sum, item) => sum + item.profitEarned, 0))}
+                    {formatCurrency((useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).filter(item => item.status === 'Settled').reduce((sum, item) => sum + item.profitEarned, 0))}
                   </div>
                   <p className="text-xs text-app-gray-500 dark:text-app-gray-400">From settled invoices</p>
                 </CardContent>
@@ -1400,10 +1520,10 @@ export function Dashboard({
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-app-gray-900 dark:text-app-gray-50">
-                    {(portfolioData.reduce((sum, item) => {
-                      const calc = calculateRealYield(item.faceValue, item.pd, item.tenor)
+                    {((useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).reduce((sum, item) => {
+                      const calc = calculateRealYield(item.faceValue, item.pd || 0.15, item.tenor || 30)
                       return sum + calc.irr
-                    }, 0) / portfolioData.length).toFixed(1)}%
+                    }, 0) / (useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).length || 0).toFixed(1)}%
                   </div>
                   <p className="text-xs text-app-gray-500 dark:text-app-gray-400">Weighted average</p>
                 </CardContent>
@@ -1438,8 +1558,8 @@ export function Dashboard({
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-app-gray-800 divide-y divide-app-gray-200 dark:divide-app-gray-700">
-                      {portfolioData.map((item) => {
-                        const calc = calculateRealYield(item.faceValue, item.pd, item.tenor)
+                      {(useRealData && realPortfolioData.length > 0 ? realPortfolioData : portfolioData).map((item) => {
+                        const calc = calculateRealYield(item.faceValue, item.pd || 0.15, item.tenor || 30)
                         return (
                           <tr key={item.id} className="hover:bg-app-gray-50 dark:hover:bg-app-gray-700 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap">

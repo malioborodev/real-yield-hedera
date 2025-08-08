@@ -39,11 +39,22 @@ class HederaWalletService {
 
   private initializeClient() {
     const network = process.env.NEXT_PUBLIC_HEDERA_NETWORK || 'testnet'
+    const operatorId = process.env.HEDERA_OPERATOR_ID
+    const operatorKey = process.env.HEDERA_OPERATOR_KEY
     
     if (network === 'mainnet') {
       this.client = Client.forMainnet()
     } else {
       this.client = Client.forTestnet()
+    }
+    
+    // Set operator if credentials are available (for server-side operations)
+    if (operatorId && operatorKey) {
+      try {
+        this.client.setOperator(AccountId.fromString(operatorId), PrivateKey.fromString(operatorKey))
+      } catch (error) {
+        console.warn('Failed to set operator credentials:', error)
+      }
     }
   }
 
@@ -53,7 +64,9 @@ class HederaWalletService {
 
   public subscribe(listener: () => void) {
     this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
   }
 
   public isConnected(): boolean {
@@ -64,7 +77,7 @@ class HederaWalletService {
     return this.accountInfo
   }
 
-  // Connect using HashPack or other Hedera wallet
+  // Connect using HashPack or Blade Wallet
   public async connect(): Promise<AccountInfo> {
     try {
       // Check if HashPack is available
@@ -75,7 +88,7 @@ class HederaWalletService {
         const initData = await hashpack.init({
           name: 'Real Yield Platform',
           description: 'Hedera Invoice Factoring Platform',
-          icon: '/real-yield-logo.svg'
+          icon: '/placeholder-logo.svg'
         })
 
         if (initData.success) {
@@ -101,28 +114,54 @@ class HederaWalletService {
         }
       }
       
-      // Fallback: simulate connection for development
-      this.accountInfo = {
-        accountId: '0.0.123456',
-        balance: 5000,
-        stakedBalance: 0,
-        walletType: 'Development'
+      // Check if Blade Wallet is available
+      if (typeof window !== 'undefined' && (window as any).bladeWallet) {
+        const blade = (window as any).bladeWallet
+        
+        // Initialize Blade Wallet connection
+        const connectResult = await blade.createSession({
+          name: 'Real Yield Platform',
+          description: 'Hedera Invoice Factoring Platform'
+        })
+
+        if (connectResult.success) {
+          const accountId = connectResult.accountId
+          
+          // Get account balance
+          const balance = await this.getAccountBalance(accountId)
+          
+          this.accountInfo = {
+            accountId: accountId,
+            balance: balance,
+            stakedBalance: 0,
+            walletType: 'Blade'
+          }
+          
+          this.isConnectedState = true
+          this.notifyListeners()
+          return this.accountInfo
+        }
       }
       
-      this.isConnectedState = true
-      this.notifyListeners()
-      return this.accountInfo
+      // If no wallet extension is found
+      throw new Error('No Hedera wallet extension found. Please install HashPack or Blade Wallet.')
       
     } catch (error) {
       console.error('Failed to connect wallet:', error)
-      throw new Error('Failed to connect to Hedera wallet')
+      throw error
     }
   }
 
   public async disconnect(): Promise<void> {
     try {
-      if (typeof window !== 'undefined' && (window as any).hashpack) {
+      // Disconnect from HashPack
+      if (typeof window !== 'undefined' && (window as any).hashpack && this.accountInfo?.walletType === 'HashPack') {
         await (window as any).hashpack.disconnect()
+      }
+      
+      // Disconnect from Blade Wallet
+      if (typeof window !== 'undefined' && (window as any).bladeWallet && this.accountInfo?.walletType === 'Blade') {
+        await (window as any).bladeWallet.disconnect()
       }
       
       this.accountInfo = null
@@ -130,6 +169,89 @@ class HederaWalletService {
       this.notifyListeners()
     } catch (error) {
       console.error('Failed to disconnect wallet:', error)
+    }
+  }
+
+  // Check which wallets are available
+  public getAvailableWallets(): string[] {
+    const wallets: string[] = []
+    
+    if (typeof window !== 'undefined') {
+      if ((window as any).hashpack) {
+        wallets.push('HashPack')
+      }
+      if ((window as any).bladeWallet) {
+        wallets.push('Blade')
+      }
+    }
+    
+    return wallets
+  }
+
+  // Connect to specific wallet
+  public async connectToWallet(walletType: 'HashPack' | 'Blade'): Promise<AccountInfo> {
+    try {
+      if (walletType === 'HashPack') {
+        if (typeof window !== 'undefined' && (window as any).hashpack) {
+          const hashpack = (window as any).hashpack
+          
+          const initData = await hashpack.init({
+            name: 'Real Yield Platform',
+            description: 'Hedera Invoice Factoring Platform',
+            icon: '/placeholder-logo.svg'
+          })
+
+          if (initData.success && initData.accountIds?.length > 0) {
+            const accountId = initData.accountIds[0]
+            const balance = await this.getAccountBalance(accountId)
+            
+            this.accountInfo = {
+              accountId: accountId,
+              balance: balance,
+              stakedBalance: 0,
+              walletType: 'HashPack'
+            }
+            
+            this.isConnectedState = true
+            this.notifyListeners()
+            return this.accountInfo
+          }
+        }
+        throw new Error('HashPack wallet not available')
+      }
+      
+      if (walletType === 'Blade') {
+        if (typeof window !== 'undefined' && (window as any).bladeWallet) {
+          const blade = (window as any).bladeWallet
+          
+          const connectResult = await blade.createSession({
+            name: 'Real Yield Platform',
+            description: 'Hedera Invoice Factoring Platform'
+          })
+
+          if (connectResult.success) {
+            const accountId = connectResult.accountId
+            const balance = await this.getAccountBalance(accountId)
+            
+            this.accountInfo = {
+              accountId: accountId,
+              balance: balance,
+              stakedBalance: 0,
+              walletType: 'Blade'
+            }
+            
+            this.isConnectedState = true
+            this.notifyListeners()
+            return this.accountInfo
+          }
+        }
+        throw new Error('Blade wallet not available')
+      }
+      
+      throw new Error('Unsupported wallet type')
+    } catch (error) {
+      console.error(`Failed to connect to ${walletType}:`, error)
+      throw error
     }
   }
 
