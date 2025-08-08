@@ -32,10 +32,10 @@ export default function LandingPage() {
         <section id="hero" className="text-center py-16 md:py-24 lg:py-32 bg-gradient-to-br from-app-green-50 to-app-blue-50 dark:from-app-gray-800 dark:to-app-gray-900 rounded-3xl shadow-xl">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-app-gray-900 dark:text-app-gray-50 leading-tight mb-6">
-              Unlock Real Yield in Global Trade Finance
+              DeFi x RWA : The Game Changer
             </h1>
             <p className="text-lg md:text-xl text-app-gray-600 dark:text-app-gray-300 mb-10 max-w-2xl mx-auto">
-              Decentralized invoice factoring on Hedera Hashgraph. Fixed-price sales, transparent fees, and real yield from actual settlements.
+              Unlock $ 2 Trillion Real World Borderless Liquidity into Blockchain Fixed-price sales, transparent fees, and real yield from actual settlements.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Button asChild className="bg-app-green-600 hover:bg-app-green-700 text-white text-lg px-8 py-3 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105">
