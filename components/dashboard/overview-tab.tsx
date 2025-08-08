@@ -43,6 +43,9 @@ export function OverviewTab({
           A decentralized invoice factoring platform powered by Hedera Hashgraph. 
           Fixed-price sales, transparent fees, and real yield from actual settlements.
         </p>
+        <p className="text-sm text-app-blue-700 dark:text-app-blue-300 mt-3">
+          Leveraging Hedera Token Service (HTS) for on-chain invoice NFTs, Consensus Service (HCS) for tamper-proof audit logs, File Service (HFS) for document storage, and Mirror Node APIs for live analytics.
+        </p>
       </div>
 
       {/* KPI Cards */}

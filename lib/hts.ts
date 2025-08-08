@@ -85,7 +85,10 @@ export class HederaTokenService {
     
     // Set operator (in production, use environment variables)
     this.operatorId = AccountId.fromString(process.env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID || '0.0.123456')
-    this.operatorKey = PrivateKey.fromString(process.env.HEDERA_PRIVATE_KEY || '302e020100300506032b657004220420...')
+    
+    // Use a valid fallback private key or generate one for demo purposes
+    const fallbackPrivateKey = '302e020100300506032b6570042204201234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+    this.operatorKey = PrivateKey.fromString(process.env.HEDERA_PRIVATE_KEY || fallbackPrivateKey)
     
     this.client.setOperator(this.operatorId, this.operatorKey)
     this.treasuryAccount = this.operatorId // Use operator as treasury for simplicity

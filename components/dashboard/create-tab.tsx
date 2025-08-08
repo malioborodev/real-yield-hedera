@@ -108,6 +108,7 @@ export function CreateTab({
       <div className="text-center py-6">
         <h2 className="text-3xl font-bold text-app-gray-900 dark:text-app-gray-50 mb-2">Create Invoice NFT</h2>
         <p className="text-app-gray-600 dark:text-app-gray-400">Mint HTS NFTs for trade finance invoices with AI-powered risk assessment</p>
+        <p className="text-sm text-app-blue-700 dark:text-app-blue-300 mt-1">Powered by Hedera Token Service (HTS) for NFT minting, Consensus Service (HCS) for audit logging, and File Service (HFS) for secure document storage.</p>
       </div>
 
       <Tabs defaultValue="create" className="space-y-6">

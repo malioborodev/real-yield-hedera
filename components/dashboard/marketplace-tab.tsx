@@ -128,6 +128,7 @@ export function MarketplaceTab({
       <div className="text-center py-6">
         <h2 className="text-3xl font-bold text-app-gray-900 dark:text-app-gray-50 mb-2">Invoice Marketplace</h2>
         <p className="text-app-gray-600 dark:text-app-gray-400">Discover and invest in trade finance opportunities</p>
+        <p className="text-sm text-app-blue-700 dark:text-app-blue-300 mt-1">Powered by Hedera Token Service (HTS) for invoice NFT trading and Mirror Node for live market data.</p>
       </div>
 
       {/* Search and Filters */}

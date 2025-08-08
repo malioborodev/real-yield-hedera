@@ -230,6 +230,11 @@ export class WalletService {
         throw new Error('Private key is required')
       }
 
+      // Validate private key format and length
+      if (privateKeyString.length < 64) {
+        throw new Error('Invalid private key: must be at least 64 characters (32 bytes in hex)')
+      }
+
       const privateKey = PrivateKey.fromString(privateKeyString)
       const publicKey = privateKey.publicKey
       

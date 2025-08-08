@@ -116,6 +116,7 @@ export function PortfolioTab({
       <div className="text-center py-6">
         <h2 className="text-3xl font-bold text-app-gray-900 dark:text-app-gray-50 mb-2">Portfolio Dashboard</h2>
         <p className="text-app-gray-600 dark:text-app-gray-400">Track your trade finance investments and returns</p>
+        <p className="text-sm text-app-blue-700 dark:text-app-blue-300 mt-1">Powered by Hedera Mirror Node for real-time portfolio data, HCS for immutable audit trail, and HTS for tokenized invoices.</p>
       </div>
 
       {/* Portfolio Overview Cards */}

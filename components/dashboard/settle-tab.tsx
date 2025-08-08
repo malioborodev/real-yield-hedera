@@ -466,3 +466,9 @@ export function SettleTab({
     </div>
   )
 }
+
+<div className="text-center py-6">
+  <h2 className="text-3xl font-bold text-app-gray-900 dark:text-app-gray-50 mb-2">Settlement &amp; Claims</h2>
+  <p className="text-app-gray-600 dark:text-app-gray-400">Manage matured invoices, initiate settlements, and claim returns</p>
+  <p className="text-sm text-app-blue-700 dark:text-app-blue-300 mt-1">Powered by Hedera Consensus Service (HCS) for settlement events and Mirror Node for real-time status updates.</p>
+</div>
