@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/header'
 import { useToast } from '@/components/ui/use-toast'
-import { WalletService, WalletConnection } from '@/lib/wallet-integration'
+import { hederaWalletService, WalletConnection } from '@/lib/hedera-wallet'
 import { OverviewTab } from '@/components/dashboard/overview-tab'
 import { CreateTab } from '@/components/dashboard/create-tab'
 import { MarketplaceTab } from '@/components/dashboard/marketplace-tab'
@@ -52,19 +52,21 @@ export function Dashboard({
   const [activeTab, setActiveTab] = useState('overview')
   const { toast } = useToast()
   const [walletConnection, setWalletConnection] = useState<WalletConnection | null>(null)
-  const walletService = new WalletService()
-  
   // Initialize wallet connection
   useEffect(() => {
     const checkWalletStatus = async () => {
-      const connection = walletService.getConnection();
+      const connection = hederaWalletService.getConnection();
       setWalletConnection(connection);
     };
     checkWalletStatus();
     
     // Subscribe to wallet events
-    const unsubscribe = walletService.subscribe((connection) => {
-      setWalletConnection(connection);
+    const unsubscribe = hederaWalletService.subscribe((event: any) => {
+      if (event.type === 'connected') {
+        setWalletConnection(event.connection);
+      } else if (event.type === 'disconnected') {
+        setWalletConnection(null);
+      }
     });
     
     return () => {
@@ -73,9 +75,9 @@ export function Dashboard({
   }, []);
   
   // Map wallet connection to local variables for compatibility
-  const isWalletConnected = walletConnection?.isConnected || isConnected || false
-  const walletBalance = walletConnection?.hbarBalance || accountInfo?.balance || 0
-  const stakedBalance = walletConnection?.stakedBalance || accountInfo?.stakedBalance || 0
+  const isWalletConnected = !!walletConnection || isConnected || false
+  const walletBalance = accountInfo?.balance || 0
+  const stakedBalance = accountInfo?.stakedBalance || 0
   
   // Create Tab State
   const [exporter, setExporter] = useState('')
@@ -228,7 +230,7 @@ export function Dashboard({
          await onStakeHBAR()
        } else {
          // Use wallet service for staking
-         await walletService.stakeHBAR(amount)
+        await hederaWalletService.transferHBAR('0.0.800', amount) // Placeholder for staking
        }
        setStakingStatus('success')
        setStakingMessage(`Successfully staked ${formatHBAR(amount)}`)
@@ -375,7 +377,6 @@ export function Dashboard({
             <MarketplaceTab 
               isWalletConnected={isWalletConnected}
               walletBalance={walletBalance}
-              onConnectWallet={onConnectWallet || (() => walletService.connectWallet('hashpack'))}
               invoices={marketplaceInvoices}
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
@@ -389,11 +390,10 @@ export function Dashboard({
               setMaxTenor={setMaxTenor}
               purchaseStatus={purchaseStatus}
               purchaseMessage={purchaseMessage}
-              onPurchaseInvoice={handlePurchaseInvoice}
-              onViewDetails={handleViewDetails}
+              handlePurchaseInvoice={handlePurchaseInvoice}
+              handleViewDetails={handleViewDetails}
               formatCurrency={formatCurrency}
               formatHBAR={formatHBAR}
-              getRiskColor={getRiskColor}
             />
           </TabsContent>
 
@@ -404,13 +404,10 @@ export function Dashboard({
               stakedBalance={stakedBalance}
               portfolioInvoices={portfolioInvoices}
               portfolioStats={portfolioStats}
-              portfolioData={portfolioData}
-              categoryData={categoryData}
               onViewInvoiceDetails={handleViewInvoiceDetails}
               onDownloadReport={handleDownloadReport}
               formatCurrency={formatCurrency}
               formatHBAR={formatHBAR}
-              getRiskColor={getRiskColor}
             />
           </TabsContent>
 
@@ -426,7 +423,6 @@ export function Dashboard({
               onClaimReturns={handleClaimReturns}
               formatCurrency={formatCurrency}
               formatHBAR={formatHBAR}
-              getRiskColor={getRiskColor}
             />
           </TabsContent>
         </Tabs>

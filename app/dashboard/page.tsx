@@ -1,7 +1,7 @@
 'use client'
 
 import { Dashboard } from '@/components/dashboard'
-import { WalletService, WalletConnection } from '@/lib/wallet-integration'
+import { hederaWalletService, WalletConnection } from '@/lib/hedera-wallet'
 import { mirrorNodeService } from '@/lib/mirror-node'
 import { hcsService } from '@/lib/hcs'
 import { useState, useEffect } from 'react'
@@ -13,18 +13,18 @@ export default function DashboardPage() {
   const [auditTrail, setAuditTrail] = useState<any[]>([])
   const [stakeAmount, setStakeAmount] = useState(0)
   const { toast } = useToast()
-  const walletService = new WalletService()
+
   
   // Initialize wallet connection
   useEffect(() => {
     const checkWalletStatus = async () => {
-      const connection = walletService.getConnection();
+      const connection = hederaWalletService.getConnection();
       setWalletConnection(connection);
     };
     checkWalletStatus();
     
     // Subscribe to wallet events
-    const unsubscribe = walletService.subscribe((connection) => {
+    const unsubscribe = hederaWalletService.subscribe((connection) => {
       setWalletConnection(connection);
       
       // Load user's invoice NFTs when wallet connects
@@ -52,7 +52,7 @@ export default function DashboardPage() {
 
   const handleConnectWallet = async () => {
     try {
-      await walletService.connectWallet('hashpack')
+      await hederaWalletService.connectWallet('hashpack')
       toast({
         title: "Wallet Connected",
         description: "Successfully connected to Hedera wallet",
@@ -68,7 +68,7 @@ export default function DashboardPage() {
 
   const handleDisconnectWallet = async () => {
     try {
-      await walletService.disconnectWallet()
+      await hederaWalletService.disconnectWallet()
       toast({
         title: "Wallet Disconnected",
         description: "Successfully disconnected from Hedera wallet",
@@ -93,7 +93,7 @@ export default function DashboardPage() {
     }
 
     try {
-      await walletService.stakeHBAR(stakeAmount)
+      await hederaWalletService.stakeHBAR(stakeAmount)
       setStakeAmount(0)
       toast({
         title: "HBAR Staked",

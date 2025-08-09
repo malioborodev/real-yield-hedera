@@ -7,15 +7,47 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { walletService, WalletConnection, WalletBalance, WalletType } from '@/lib/wallet-integration'
-import { Wallet, Copy, ExternalLink, AlertCircle, CheckCircle, Loader2, Eye, EyeOff } from 'lucide-react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Progress } from '@/components/ui/progress'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { hederaWalletService, WalletConnection, WalletBalance, WalletType } from '@/lib/hedera-wallet'
+import { Wallet, Copy, ExternalLink, AlertCircle, CheckCircle, Loader2, Zap, Shield, Coins, Globe, Download } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface WalletConnectProps {
   onConnectionChange?: (connection: WalletConnection | null) => void
+}
+
+const WALLET_INFO = {
+  hashpack: {
+    name: 'HashPack',
+    description: 'Native Hedera wallet with full ecosystem support',
+    icon: '🔷',
+    features: ['Native Hedera', 'HTS Support', 'HCS Support', 'Staking'],
+    downloadUrl: 'https://www.hashpack.app/'
+  },
+  blade: {
+    name: 'Blade Wallet',
+    description: 'Multi-chain wallet with Hedera integration',
+    icon: '⚔️',
+    features: ['Multi-chain', 'DeFi Ready', 'NFT Support', 'Mobile App'],
+    downloadUrl: 'https://bladewallet.io/'
+  },
+  kabila: {
+    name: 'Kabila Wallet',
+    description: 'Enterprise-grade Hedera wallet solution',
+    icon: '🏛️',
+    features: ['Enterprise', 'Security Focus', 'API Access', 'Compliance'],
+    downloadUrl: 'https://kabila.app/'
+  },
+  metamask: {
+    name: 'MetaMask',
+    description: 'Popular Ethereum wallet with Hedera EVM support',
+    icon: '🦊',
+    features: ['EVM Compatible', 'Browser Extension', 'Mobile App', 'DApp Browser'],
+    downloadUrl: 'https://metamask.io/'
+  }
 }
 
 export function WalletConnect({ onConnectionChange }: WalletConnectProps) {
@@ -24,59 +56,54 @@ export function WalletConnect({ onConnectionChange }: WalletConnectProps) {
   const [isConnecting, setIsConnecting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showPrivateKey, setShowPrivateKey] = useState(false)
-  const [privateKey, setPrivateKey] = useState('')
-  const [availableWallets, setAvailableWallets] = useState<Record<WalletType, boolean>>({})
+  const [availableWallets, setAvailableWallets] = useState<Record<WalletType, boolean>>({} as Record<WalletType, boolean>)
+  const [showWalletDialog, setShowWalletDialog] = useState(false)
 
   useEffect(() => {
     checkWalletAvailability()
     
     // Check if already connected
-    const existingConnection = walletService.getConnection()
+    const existingConnection = hederaWalletService.getConnection()
     if (existingConnection) {
       setConnection(existingConnection)
       loadBalance()
     }
 
     // Subscribe to wallet events
-    const handleConnection = (conn: WalletConnection) => {
-      setConnection(conn)
-      onConnectionChange?.(conn)
-      loadBalance()
-      toast.success('Wallet connected successfully!')
-    }
+    const unsubscribe = hederaWalletService.subscribe((event: any) => {
+      if (event.type === 'connected') {
+        setConnection(event.connection)
+        onConnectionChange?.(event.connection)
+        loadBalance()
+        const walletInfo = WALLET_INFO[event.connection.walletType as keyof typeof WALLET_INFO]
+        toast.success(`${walletInfo.name} connected successfully!`)
+        setShowWalletDialog(false)
+      } else if (event.type === 'disconnected') {
+        setConnection(null)
+        setBalance(null)
+        onConnectionChange?.(null)
+        toast.info('Wallet disconnected')
+      }
+    })
 
-    const handleDisconnection = () => {
-      setConnection(null)
-      setBalance(null)
-      onConnectionChange?.(null)
-      toast.info('Wallet disconnected')
-    }
-
-    walletService.subscribe('connection', handleConnection)
-    walletService.subscribe('disconnection', handleDisconnection)
-
-    return () => {
-      walletService.unsubscribe('connection', handleConnection)
-      walletService.unsubscribe('disconnection', handleDisconnection)
-    }
+    return () => unsubscribe()
   }, [])
 
   const checkWalletAvailability = async () => {
-    const wallets = walletService.getSupportedWallets()
-    const availability: Record<WalletType, boolean> = {} as any
-    
-    for (const wallet of wallets) {
-      availability[wallet] = await walletService.checkWalletAvailability(wallet)
+    try {
+      const availability = await hederaWalletService.checkWalletAvailability()
+      setAvailableWallets(availability)
+    } catch (error) {
+      console.error('Failed to check wallet availability:', error)
     }
-    
-    setAvailableWallets(availability)
   }
 
   const loadBalance = async () => {
+    if (!connection) return
+    
+    setIsLoading(true)
     try {
-      setIsLoading(true)
-      const walletBalance = await walletService.getAccountBalance()
+      const walletBalance = await hederaWalletService.getAccountBalance()
       setBalance(walletBalance)
     } catch (error) {
       console.error('Failed to load balance:', error)
@@ -86,20 +113,22 @@ export function WalletConnect({ onConnectionChange }: WalletConnectProps) {
     }
   }
 
-  const handleConnect = async (walletType: WalletType, options?: any) => {
+  const handleConnect = async (walletType: WalletType) => {
+    if (!availableWallets[walletType]) {
+      toast.error(`${WALLET_INFO[walletType].name} is not installed. Please install it first.`)
+      window.open(WALLET_INFO[walletType].downloadUrl, '_blank')
+      return
+    }
+
+    setIsConnecting(true)
+    setError(null)
+    
     try {
-      setIsConnecting(true)
-      setError(null)
-      
-      const conn = await walletService.connectWallet(walletType, options)
-      setConnection(conn)
-      onConnectionChange?.(conn)
-      
-      // Load balance after connection
-      await loadBalance()
-    } catch (error: any) {
-      setError(error.message)
-      toast.error(`Failed to connect: ${error.message}`)
+      await hederaWalletService.connectWallet(walletType)
+    } catch (error) {
+      console.error(`Failed to connect ${walletType}:`, error)
+      setError(error instanceof Error ? error.message : 'Failed to connect wallet')
+      toast.error(`Failed to connect ${WALLET_INFO[walletType].name}`)
     } finally {
       setIsConnecting(false)
     }
@@ -107,144 +136,118 @@ export function WalletConnect({ onConnectionChange }: WalletConnectProps) {
 
   const handleDisconnect = async () => {
     try {
-      await walletService.disconnectWallet()
-      setConnection(null)
-      setBalance(null)
-      onConnectionChange?.(null)
-    } catch (error: any) {
-      toast.error(`Failed to disconnect: ${error.message}`)
+      await hederaWalletService.disconnectWallet()
+    } catch (error) {
+      console.error('Failed to disconnect wallet:', error)
+      toast.error('Failed to disconnect wallet')
     }
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast.success('Copied to clipboard!')
-  }
-
-  const formatAccountId = (accountId: string) => {
-    return `${accountId.slice(0, 8)}...${accountId.slice(-6)}`
-  }
-
-  const formatBalance = (amount: number, decimals: number = 8) => {
-    return (amount / Math.pow(10, decimals)).toFixed(4)
-  }
-
-  const getWalletIcon = (walletType: WalletType) => {
-    const icons = {
-      hashpack: '🔗',
-      blade: '⚔️',
-      kabila: '🏛️',
-      'metamask-hedera': '🦊',
-      'private-key': '🔑'
+  const copyAccountId = () => {
+    if (connection?.accountId) {
+      navigator.clipboard.writeText(connection.accountId)
+      toast.success('Account ID copied to clipboard')
     }
-    return icons[walletType] || '💼'
   }
 
-  const getWalletName = (walletType: WalletType) => {
-    const names = {
-      hashpack: 'HashPack',
-      blade: 'Blade Wallet',
-      kabila: 'Kabila Wallet',
-      'metamask-hedera': 'MetaMask (Hedera)',
-      'private-key': 'Private Key'
+  const openInExplorer = () => {
+    if (connection?.accountId) {
+      const baseUrl = connection.network === 'mainnet' 
+        ? 'https://hashscan.io/mainnet' 
+        : 'https://hashscan.io/testnet'
+      window.open(`${baseUrl}/account/${connection.accountId}`, '_blank')
     }
-    return names[walletType] || walletType
   }
 
   if (connection) {
+    const walletInfo = WALLET_INFO[connection.walletType]
+    
     return (
       <Card className="w-full max-w-md">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Wallet className="h-5 w-5" />
-              <CardTitle className="text-lg">Wallet Connected</CardTitle>
+              <span className="text-2xl">{walletInfo.icon}</span>
+              <div>
+                <CardTitle className="text-lg">{walletInfo.name}</CardTitle>
+                <CardDescription>Connected to {connection.network}</CardDescription>
+              </div>
             </div>
             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              <CheckCircle className="h-3 w-3 mr-1" />
+              <CheckCircle className="w-3 h-3 mr-1" />
               Connected
             </Badge>
           </div>
-          <CardDescription>
-            Network: {connection.network.toUpperCase()}
-          </CardDescription>
         </CardHeader>
         
         <CardContent className="space-y-4">
           {/* Account Info */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Account ID</Label>
-            <div className="flex items-center space-x-2">
-              <code className="flex-1 px-2 py-1 bg-gray-100 rounded text-sm">
-                {formatAccountId(connection.accountId)}
-              </code>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyToClipboard(connection.accountId)}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Account ID</span>
+              <div className="flex items-center space-x-1">
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {connection.accountId.slice(0, 8)}...{connection.accountId.slice(-6)}
+                </code>
+                <Button variant="ghost" size="sm" onClick={copyAccountId}>
+                  <Copy className="w-3 h-3" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={openInExplorer}>
+                  <ExternalLink className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Balance */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span className="text-sm text-gray-600">Loading balance...</span>
-            </div>
-          ) : balance ? (
-            <div className="space-y-3">
-              <Separator />
-              
-              {/* HBAR Balance */}
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">HBAR Balance</span>
-                <span className="text-sm font-mono">{balance.hbar.toFixed(4)} ℏ</span>
-              </div>
+          <Separator />
 
-              {/* Token Balances */}
-              {balance.tokens.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Token Balances</Label>
-                  <div className="max-h-32 overflow-y-auto space-y-1">
-                    {balance.tokens.map((token, index) => (
-                      <div key={index} className="flex justify-between items-center text-xs">
-                        <span className="font-mono">{token.symbol}</span>
-                        <span className="font-mono">
-                          {formatBalance(token.balance, token.decimals)}
-                        </span>
+          {/* Balance */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Balance</span>
+              {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+            </div>
+            
+            {balance && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Coins className="w-4 h-4 text-blue-500" />
+                    <span className="font-medium">HBAR</span>
+                  </div>
+                  <span className="font-mono text-lg">
+                    {balance.hbar.toFixed(4)}
+                  </span>
+                </div>
+                
+                {balance.tokens.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Tokens</span>
+                    {balance.tokens.slice(0, 3).map((token: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                        <span>{token.symbol}</span>
+                        <span className="font-mono">{token.balance}</span>
                       </div>
                     ))}
+                    {balance.tokens.length > 3 && (
+                      <div className="text-xs text-muted-foreground text-center py-1">
+                        +{balance.tokens.length - 3} more tokens
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-          ) : null}
+                )}
+              </div>
+            )}
+          </div>
 
           <Separator />
 
           {/* Actions */}
           <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={loadBalance}
-              disabled={isLoading}
-              className="flex-1"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              Refresh
+            <Button variant="outline" size="sm" onClick={loadBalance} disabled={isLoading}>
+              {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Refresh'}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDisconnect}
-              className="flex-1"
-            >
+            <Button variant="outline" size="sm" onClick={handleDisconnect}>
               Disconnect
             </Button>
           </div>
@@ -254,121 +257,139 @@ export function WalletConnect({ onConnectionChange }: WalletConnectProps) {
   }
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button className="flex items-center space-x-2">
-          <Wallet className="h-4 w-4" />
-          <span>Connect Wallet</span>
-        </Button>
-      </DialogTrigger>
-      
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Wallet className="h-5 w-5" />
-            <span>Connect Your Wallet</span>
-          </DialogTitle>
-          <DialogDescription>
-            Choose a wallet to connect to the Real-Yield Hedera platform.
-          </DialogDescription>
-        </DialogHeader>
+    <div className="w-full max-w-md">
+      <Dialog open={showWalletDialog} onOpenChange={setShowWalletDialog}>
+        <DialogTrigger asChild>
+          <Button className="w-full" size="lg">
+            <Wallet className="w-4 h-4 mr-2" />
+            Connect Wallet
+          </Button>
+        </DialogTrigger>
+        
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Connect Your Hedera Wallet</DialogTitle>
+            <DialogDescription>
+              Choose your preferred wallet to connect to the Real Yield platform
+            </DialogDescription>
+          </DialogHeader>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        <Tabs defaultValue="wallets" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="wallets">Wallet Apps</TabsTrigger>
-            <TabsTrigger value="private-key">Private Key</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="wallets" className="space-y-3">
-            <div className="space-y-2">
-              {(['hashpack', 'blade', 'kabila', 'metamask-hedera'] as WalletType[]).map((walletType) => (
-                <Button
-                  key={walletType}
-                  variant="outline"
-                  className="w-full justify-start h-12"
-                  onClick={() => handleConnect(walletType)}
-                  disabled={isConnecting || !availableWallets[walletType]}
-                >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-lg">{getWalletIcon(walletType)}</span>
-                    <div className="flex-1 text-left">
-                      <div className="font-medium">{getWalletName(walletType)}</div>
-                      {!availableWallets[walletType] && (
-                        <div className="text-xs text-gray-500">Not installed</div>
+          <Tabs defaultValue="recommended" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="recommended">Recommended</TabsTrigger>
+              <TabsTrigger value="all">All Wallets</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="recommended" className="space-y-3">
+              {/* HashPack - Primary recommendation */}
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors" 
+                    onClick={() => handleConnect('hashpack')}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl">{WALLET_INFO.hashpack.icon}</span>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">{WALLET_INFO.hashpack.name}</span>
+                          <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {WALLET_INFO.hashpack.description}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {WALLET_INFO.hashpack.features.slice(0, 2).map((feature) => (
+                            <Badge key={feature} variant="outline" className="text-xs">
+                              {feature}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end space-y-1">
+                      {availableWallets.hashpack ? (
+                        <Badge variant="outline" className="bg-green-50 text-green-700">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Installed
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                          Install
+                        </Badge>
                       )}
                     </div>
-                    {!availableWallets[walletType] && (
-                      <ExternalLink className="h-4 w-4 text-gray-400" />
-                    )}
                   </div>
-                </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="all" className="space-y-3">
+              {Object.entries(WALLET_INFO).map(([walletType, info]) => (
+                <Card key={walletType} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors" 
+                      onClick={() => handleConnect(walletType as WalletType)}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xl">{info.icon}</span>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">{info.name}</span>
+                            {walletType === 'hashpack' && (
+                              <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{info.description}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {info.features.slice(0, 3).map((feature) => (
+                              <Badge key={feature} variant="outline" className="text-xs">
+                                {feature}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end space-y-1">
+                        {availableWallets[walletType as WalletType] ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Installed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                            Install
+                          </Badge>
+                        )}
+                        {isConnecting && (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-            </div>
-            
-            {isConnecting && (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                <span className="text-sm text-gray-600">Connecting...</span>
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="private-key" className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                Only use this for testing. Never enter your mainnet private key.
-              </AlertDescription>
-            </Alert>
-            
-            <div className="space-y-2">
-              <Label htmlFor="private-key">Private Key</Label>
-              <div className="relative">
-                <Input
-                  id="private-key"
-                  type={showPrivateKey ? 'text' : 'password'}
-                  placeholder="Enter your private key..."
-                  value={privateKey}
-                  onChange={(e) => setPrivateKey(e.target.value)}
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => setShowPrivateKey(!showPrivateKey)}
-                >
-                  {showPrivateKey ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-            
-            <Button
-              className="w-full"
-              onClick={() => handleConnect('private-key', { privateKey })}
-              disabled={isConnecting || !privateKey.trim()}
-            >
-              {isConnecting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              Connect with Private Key
-            </Button>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+            </TabsContent>
+          </Tabs>
+
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">
+              New to Hedera? We recommend starting with{' '}
+              <a href="https://www.hashpack.app/" target="_blank" rel="noopener noreferrer" 
+                 className="text-blue-600 hover:underline">
+                HashPack
+              </a>{' '}
+              for the best experience.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
 

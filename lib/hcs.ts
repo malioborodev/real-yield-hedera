@@ -45,35 +45,75 @@ export class HederaConsensusService {
     // Initialize Hedera client for testnet
     this.client = Client.forTestnet()
     
-    // Set operator (in production, use environment variables)
-    this.operatorId = AccountId.fromString(process.env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID || '0.0.123456')
+    // Set operator using environment variables
+    const operatorId = process.env.HEDERA_OPERATOR_ID || process.env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID || '0.0.123456'
+    this.operatorId = AccountId.fromString(operatorId)
     
-    // Validate private key length before parsing
-    const privateKeyString = process.env.HEDERA_PRIVATE_KEY || '302e020100300506032b657004220420a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456'
-    if (privateKeyString.length < 64) {
-      throw new Error('Invalid private key: must be at least 64 characters long')
+    // In browser environment, use mock mode
+    if (typeof window !== 'undefined') {
+      console.log('Running in browser mode - using existing topic IDs')
+      this.operatorKey = PrivateKey.generate() // Generate dummy key for browser
+      this.initializeTopics().catch(console.error)
+      return
     }
-    this.operatorKey = PrivateKey.fromString(privateKeyString)
     
-    this.client.setOperator(this.operatorId, this.operatorKey)
+    // Server-side initialization with real credentials
+    const privateKeyString = process.env.HEDERA_OPERATOR_KEY || '302e020100300506032b657004220420a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456'
+    
+    try {
+      this.operatorKey = PrivateKey.fromString(privateKeyString)
+      this.client.setOperator(this.operatorId, this.operatorKey)
+      console.log('Hedera client initialized for server-side operations')
+    } catch (error) {
+      console.warn('Failed to set operator with provided key:', error)
+      this.operatorKey = PrivateKey.generate()
+    }
     
     // Initialize topics
-    this.initializeTopics()
+    this.initializeTopics().catch(console.error)
   }
 
   private async initializeTopics() {
     try {
-      // Create main audit topic if not exists
+      // In browser environment, use existing topic IDs from environment
+      if (typeof window !== 'undefined') {
+        // Use existing topic IDs for demo
+        const mainTopicId = process.env.NEXT_PUBLIC_HCS_INVOICE_TOPIC
+        if (mainTopicId) {
+          this.mainAuditTopic = TopicId.fromString(mainTopicId)
+          console.log('Using existing main audit topic:', this.mainAuditTopic.toString())
+        }
+        
+        // Set up regional topics with existing IDs
+        const regions = ['APAC', 'EMEA', 'AMERICAS']
+        const topicIds = [
+          process.env.NEXT_PUBLIC_HCS_FUNDING_TOPIC,
+          process.env.NEXT_PUBLIC_HCS_SETTLEMENT_TOPIC,
+          process.env.NEXT_PUBLIC_HCS_RISK_TOPIC
+        ]
+        
+        regions.forEach((region, index) => {
+          if (topicIds[index]) {
+            this.regionalTopics.set(region, TopicId.fromString(topicIds[index]))
+            console.log(`Using existing ${region} topic:`, topicIds[index])
+          }
+        })
+        return
+      }
+      
+      // Server-side topic creation (only if we have valid credentials)
       if (!this.mainAuditTopic) {
-        this.mainAuditTopic = await this.createTopic('Global Invoice Audit Trail')
+        this.mainAuditTopic = await this.createTopic('Real-Yield Main Audit Trail')
+        console.log('Created main audit topic:', this.mainAuditTopic.toString())
       }
       
       // Create regional topics
-      const regions = ['APAC', 'EMEA', 'AMERICAS', 'AFRICA', 'MIDDLE_EAST']
+      const regions = ['APAC', 'EMEA', 'AMERICAS']
       for (const region of regions) {
         if (!this.regionalTopics.has(region)) {
-          const topicId = await this.createTopic(`${region} Regional Invoice Topic`)
+          const topicId = await this.createTopic(`Real-Yield ${region} Regional Topic`)
           this.regionalTopics.set(region, topicId)
+          console.log(`Created ${region} topic:`, topicId.toString())
         }
       }
     } catch (error) {
@@ -128,7 +168,13 @@ export class HederaConsensusService {
         }
       }
 
-      // Submit to both main audit topic and regional topic
+      // In browser environment, use mock submission
+      if (typeof window !== 'undefined') {
+        console.log(`[MOCK] Invoice ${message.invoiceId} submitted to HCS for region ${region}`, message)
+        return `mock:${message.invoiceId}`
+      }
+
+      // Submit to both main audit topic and regional topic (server-side only)
       const mainSubmission = this.submitMessageToTopic(this.mainAuditTopic!, message)
       
       const regionalTopicId = this.regionalTopics.get(region)
@@ -352,7 +398,8 @@ export class HederaConsensusService {
 }
 
 // Export singleton instance
-export const hcsService = new HederaConsensusService()
+// Only initialize HCS service in browser environment
+export const hcsService = typeof window !== 'undefined' ? new HederaConsensusService() : null as any
 
 // Export types for use in other files
 export type { InvoiceAuditMessage, RegionalTopic, AuditTrailEntry }

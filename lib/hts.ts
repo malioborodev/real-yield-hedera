@@ -71,6 +71,13 @@ interface TokenPortfolio {
   totalTokens: number
 }
 
+interface TransactionResult {
+  success: boolean
+  transactionId?: string
+  receipt?: any
+  error?: string
+}
+
 export class HederaTokenService {
   private client: Client
   private operatorId: AccountId
@@ -97,7 +104,7 @@ export class HederaTokenService {
   async createInvoiceToken(
     invoiceData: any,
     initialSupply: number = 1000000 // Default 1M tokens representing invoice fractions
-  ): Promise<InvoiceToken> {
+  ): Promise<TransactionResult> {
     try {
       const tokenSymbol = `RY${invoiceData.commodity.substring(0, 3).toUpperCase()}${Date.now().toString().slice(-4)}`
       const tokenName = `Real Yield ${invoiceData.commodity} Invoice Token`
@@ -175,10 +182,17 @@ export class HederaTokenService {
       })
 
       console.log(`Created invoice token: ${tokenId.toString()} (${tokenSymbol})`)
-      return invoiceToken
+      return {
+        success: true,
+        transactionId: response.transactionId.toString(),
+        receipt: { tokenId: tokenId.toString(), ...invoiceToken }
+      }
     } catch (error) {
       console.error('Error creating invoice token:', error)
-      throw error
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
     }
   }
 

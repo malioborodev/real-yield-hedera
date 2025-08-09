@@ -14,43 +14,46 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { WalletService, WalletConnection } from '@/lib/wallet-integration'
+import { hederaWalletService, WalletConnection } from '@/lib/hedera-wallet'
 
 export function Header({ showNav = true, showCreateInvoice = true }: { showNav?: boolean; showCreateInvoice?: boolean }) {
   const [walletConnection, setWalletConnection] = useState<WalletConnection | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
-  const walletService = new WalletService()
-
   useEffect(() => {
     const checkWalletStatus = async () => {
-      const connection = walletService.getConnection();
+      const connection = hederaWalletService.getConnection();
       setWalletConnection(connection);
     };
     checkWalletStatus();
     
     // Subscribe to wallet events
-    const unsubscribe = walletService.subscribe((connection) => {
-      setWalletConnection(connection);
+    const unsubscribe = hederaWalletService.subscribe((event: any) => {
+      if (event.type === 'connected') {
+        setWalletConnection(event.connection);
+      } else if (event.type === 'disconnected') {
+        setWalletConnection(null);
+      }
     });
     
     return () => {
-      unsubscribe();
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, []);
 
   const handleConnectWallet = async () => {
     setIsConnecting(true);
-    if (!walletConnection?.isConnected) {
+    if (!walletConnection) {
       try {
-        await walletService.connectWallet('hashpack'); // Default to HashPack
+        await hederaWalletService.connectWallet('hashpack');
       } catch (error) {
         console.error('Failed to connect wallet:', error);
-      } finally {
-        setIsConnecting(false);
       }
+      setIsConnecting(false);
     } else {
       try {
-        await walletService.disconnectWallet();
+        await hederaWalletService.disconnectWallet();
       } catch (error) {
         console.error('Failed to disconnect wallet:', error);
       } finally {
@@ -66,8 +69,10 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
     }
   }
 
-  const formatHBAR = (value: number) => {
-    return `${value.toFixed(2)} ℏ`
+  const formatHBAR = (value: number | string | undefined) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value
+    const validValue = typeof numValue === 'number' && !isNaN(numValue) ? numValue : 0
+    return `${validValue.toFixed(2)} ℏ`
   }
 
   return (
@@ -115,13 +120,13 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
               {walletConnection?.isConnected && (
                 <Badge variant="outline" className="text-xs font-medium px-2 py-1 rounded-full border-app-blue-200 text-app-blue-600 dark:border-app-blue-700 dark:text-app-blue-400">
                   <Circle className="w-2 h-2 mr-1 fill-app-blue-500 text-app-blue-500" />
-                  {walletConnection.walletType}
+                  {(walletConnection as any).walletType}
                 </Badge>
               )}
-              <span className="text-xs text-app-green-600 flex items-center dark:text-app-green-400">
+              <Badge variant="outline" className="text-xs">
                 <Circle className="w-2 h-2 mr-1 fill-app-green-500 text-app-green-500" />
                 Live data connected
-              </span>
+              </Badge>
             </div>
           </div>
           
@@ -146,7 +151,12 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
                   <div className="flex flex-col space-y-1">
                     <p className="text-base leading-none">Hedera Wallet</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {walletConnection?.isConnected ? `Connected via ${walletConnection.walletType}` : 'Not connected'}
+                      {walletConnection?.isConnected ? 
+                        (walletConnection as any).walletType === 'private-key' ? 
+                          'Connected via Demo Wallet' : 
+                          `Connected via ${(walletConnection as any).walletType}` : 
+                        'Not connected'
+                      }
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -166,7 +176,7 @@ export function Header({ showNav = true, showCreateInvoice = true }: { showNav?:
                     
                     <DropdownMenuItem className="flex flex-col items-start p-3 cursor-default hover:bg-transparent focus:bg-transparent">
                       <span className="text-sm font-medium text-app-gray-700 dark:text-app-gray-300 mb-1">Balance</span>
-                      <span className="text-xl font-bold text-app-green-600 dark:text-app-green-400">{formatHBAR(walletConnection.hbarBalance)}</span>
+                      <span className="text-xl font-bold text-app-green-600 dark:text-app-green-400">{formatHBAR((walletConnection as any).hbarBalance || 0)}</span>
                     </DropdownMenuItem>
                     
                     <DropdownMenuSeparator className="my-2 bg-app-gray-200 dark:bg-app-gray-700" />
