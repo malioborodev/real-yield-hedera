@@ -1,4 +1,5 @@
 const { ethers } = require('hardhat');
+const hre = require('hardhat');
 const fs = require('fs');
 const path = require('path');
 
@@ -8,26 +9,26 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log('📝 Deploying contracts with account:', deployer.address);
   
-  const balance = await deployer.getBalance();
-  console.log('💰 Account balance:', ethers.utils.formatEther(balance), 'HBAR');
+  const balance = await deployer.provider.getBalance(deployer.address);
+  console.log('💰 Account balance:', ethers.formatEther(balance), 'HBAR');
 
   // Deploy InsurancePool first
   console.log('\n📦 Deploying InsurancePool...');
   const InsurancePool = await ethers.getContractFactory('InsurancePool');
   const insurancePool = await InsurancePool.deploy();
-  await insurancePool.deployed();
-  console.log('✅ InsurancePool deployed to:', insurancePool.address);
+  await insurancePool.waitForDeployment();
+  console.log('✅ InsurancePool deployed to:', await insurancePool.getAddress());
 
   // Deploy RealYieldInvoiceFactoring
   console.log('\n📦 Deploying RealYieldInvoiceFactoring...');
   const RealYieldInvoiceFactoring = await ethers.getContractFactory('RealYieldInvoiceFactoring');
-  const invoiceFactoring = await RealYieldInvoiceFactoring.deploy(insurancePool.address);
-  await invoiceFactoring.deployed();
-  console.log('✅ RealYieldInvoiceFactoring deployed to:', invoiceFactoring.address);
+  const invoiceFactoring = await RealYieldInvoiceFactoring.deploy(await insurancePool.getAddress());
+  await invoiceFactoring.waitForDeployment();
+  console.log('✅ RealYieldInvoiceFactoring deployed to:', await invoiceFactoring.getAddress());
 
   // Set up insurance pool with factoring contract
   console.log('\n🔗 Setting up contract relationships...');
-  const tx = await insurancePool.setFactoringContract(invoiceFactoring.address);
+  const tx = await insurancePool.setFactoringContract(await invoiceFactoring.getAddress());
   await tx.wait();
   console.log('✅ Insurance pool configured with factoring contract');
 
@@ -38,12 +39,12 @@ async function main() {
     deployer: deployer.address,
     contracts: {
       InsurancePool: {
-        address: insurancePool.address,
-        transactionHash: insurancePool.deployTransaction.hash,
+        address: await insurancePool.getAddress(),
+        transactionHash: insurancePool.deploymentTransaction().hash,
       },
       RealYieldInvoiceFactoring: {
-        address: invoiceFactoring.address,
-        transactionHash: invoiceFactoring.deployTransaction.hash,
+        address: await invoiceFactoring.getAddress(),
+        transactionHash: invoiceFactoring.deploymentTransaction().hash,
       },
     },
   };

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+// Removed Counters and SafeMath imports as they're deprecated/unnecessary in OpenZeppelin v5
 
 // Mock HTS Token Interface (simplified for demonstration)
 interface IHederaTokenService {
@@ -28,10 +27,7 @@ interface IHederaSmartContractService {
 }
 
 contract RealYieldInvoiceFactoring is ERC721, Ownable {
-    using Counters for Counters.Counter;
-    using SafeMath for uint256;
-
-    Counters.Counter private _invoiceIds;
+    uint256 private _invoiceIds;
 
     struct Invoice {
         uint256 id;
@@ -74,7 +70,7 @@ contract RealYieldInvoiceFactoring is ERC721, Ownable {
     event HBARStaked(address indexed account, uint256 amount);
     event HBARUnstaked(address indexed account, uint256 amount);
 
-    constructor(address _htsContractId, address _hcsContractId, address _insurancePoolContractId) ERC721("RealYieldInvoiceNFT", "RYIN") {
+    constructor(address _htsContractId, address _hcsContractId, address _insurancePoolContractId) ERC721("RealYieldInvoiceNFT", "RYIN") Ownable(msg.sender) {
         require(_htsContractId != address(0), "HTS contract address cannot be zero");
         require(_hcsContractId != address(0), "HCS contract address cannot be zero");
         require(_insurancePoolContractId != address(0), "Insurance Pool contract address cannot be zero");
@@ -99,7 +95,7 @@ contract RealYieldInvoiceFactoring is ERC721, Ownable {
      */
     function stakeHBAR() public payable {
         require(msg.value > 0, "Amount to stake must be greater than zero");
-        stakedCollateral[msg.sender] = stakedCollateral[msg.sender].add(msg.value);
+        stakedCollateral[msg.sender] = stakedCollateral[msg.sender] + msg.value;
         emit HBARStaked(msg.sender, msg.value);
     }
 
@@ -110,7 +106,7 @@ contract RealYieldInvoiceFactoring is ERC721, Ownable {
         require(stakedCollateral[msg.sender] >= amount, "Insufficient staked HBAR");
         // In a real system, we'd need to ensure this amount isn't part of active collateral
         // For this mock, we assume any unstake request is for free HBAR.
-        stakedCollateral[msg.sender] = stakedCollateral[msg.sender].sub(amount);
+        stakedCollateral[msg.sender] = stakedCollateral[msg.sender] - amount;
         payable(msg.sender).transfer(amount);
         emit HBARUnstaked(msg.sender, amount);
     }
@@ -134,19 +130,19 @@ contract RealYieldInvoiceFactoring is ERC721, Ownable {
         require(_htsTokenId != address(0), "HTS Token ID cannot be zero");
         require(_hcsTopicId != address(0), "HCS Topic ID cannot be zero");
 
-        uint256 requiredCollateral = _faceValue.mul(COLLATERAL_PERCENTAGE_BASIS_POINTS).div(10000);
+        uint256 requiredCollateral = _faceValue * COLLATERAL_PERCENTAGE_BASIS_POINTS / 10000;
         require(stakedCollateral[msg.sender] >= requiredCollateral, "Insufficient staked HBAR for collateral");
 
-        _invoiceIds.increment();
-        uint256 newInvoiceId = _invoiceIds.current();
+        _invoiceIds++;
+        uint256 newInvoiceId = _invoiceIds;
 
         // Simulate locking collateral from staked balance
-        stakedCollateral[msg.sender] = stakedCollateral[msg.sender].sub(requiredCollateral);
+        stakedCollateral[msg.sender] = stakedCollateral[msg.sender] - requiredCollateral;
 
         // Simulate HTS NFT minting
         // In a real scenario, this would interact with the Hedera Token Service precompile
         // For now, we just assign a mock serial number.
-        int64 mintedSerialNumber = int64(newInvoiceId); // Mock serial number
+        int64 mintedSerialNumber = int64(uint64(newInvoiceId)); // Mock serial number
 
         Invoice storage newInvoice = invoices[newInvoiceId];
         newInvoice.id = newInvoiceId;
@@ -188,9 +184,9 @@ contract RealYieldInvoiceFactoring is ERC721, Ownable {
 
         // Calculate fees and buy price based on the formula
         uint256 discountRate = calculateDiscountRate(invoice.pd, invoice.tenor); // Assuming this function exists or is in JS
-        uint256 reserveFeeAmount = invoice.faceValue.mul(RESERVE_FEE_BASIS_POINTS).div(10000);
-        uint256 platformFeeAmount = invoice.faceValue.mul(PLATFORM_FEE_BASIS_POINTS).div(10000);
-        uint256 expectedBuyPrice = invoice.faceValue.sub(invoice.faceValue.mul(discountRate).div(10000)).sub(reserveFeeAmount).sub(platformFeeAmount);
+        uint256 reserveFeeAmount = invoice.faceValue * RESERVE_FEE_BASIS_POINTS / 10000;
+        uint256 platformFeeAmount = invoice.faceValue * PLATFORM_FEE_BASIS_POINTS / 10000;
+        uint256 expectedBuyPrice = invoice.faceValue - (invoice.faceValue * discountRate / 10000) - reserveFeeAmount - platformFeeAmount;
 
         require(_amountUSDC >= expectedBuyPrice, "Amount sent is less than the required buy price");
 
@@ -226,8 +222,8 @@ contract RealYieldInvoiceFactoring is ERC721, Ownable {
         // In a real system, this would check if the invoice is actually settled on-chain
         // For mock, we assume it's settled if this function is called by owner.
 
-        require(stakedCollateral[invoice.exporter].add(invoice.collateralAmount) <= type(uint256).max, "Overflow in collateral release");
-        stakedCollateral[invoice.exporter] = stakedCollateral[invoice.exporter].add(invoice.collateralAmount);
+        require(stakedCollateral[invoice.exporter] + invoice.collateralAmount <= type(uint256).max, "Overflow in collateral release");
+        stakedCollateral[invoice.exporter] = stakedCollateral[invoice.exporter] + invoice.collateralAmount;
         invoice.collateralReleased = true;
 
         emit CollateralReleased(_invoiceId, invoice.exporter, invoice.collateralAmount);
@@ -240,10 +236,10 @@ contract RealYieldInvoiceFactoring is ERC721, Ownable {
         uint256 d_max = 800; // 8.0% * 10000
         
         // Scale PD from 0-100 to 0-10000 for basis points calculation
-        uint256 scaledPd = _pd.mul(100); // PD is 0-100, scale to 0-10000
+        uint256 scaledPd = _pd * 100; // PD is 0-100, scale to 0-10000
 
         // d = d_min + (d_max - d_min) * PD / 10000 (since PD is scaled to 10000)
-        uint256 discountRate = d_min.add(d_max.sub(d_min).mul(scaledPd).div(10000));
+        uint256 discountRate = d_min + ((d_max - d_min) * scaledPd / 10000);
         
         return discountRate; // Returns in basis points (e.g., 100 = 1%)
     }

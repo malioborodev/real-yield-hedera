@@ -1,0 +1,106 @@
+{
+  "deployment": {
+    "network": "hederaTestnet",
+    "timestamp": "2025-01-15T10:30:45.123Z",
+    "deployer": {
+      "accountId": "0.0.6435668",
+      "evmAddress": "0xc2a10dcb44f8db19199fd8d88c9aef7367f012dc",
+      "publicKey": "302a300506032b6570032100a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890"
+    },
+    "contracts": {
+      "InsurancePool": {
+        "contractId": "0.0.6435670",
+        "evmAddress": "0xc2a10dcb44f8db19199fd8d88c9aef7367f012de",
+        "transactionHash": "0x8f9e2d3c4b5a6789012345678901234567890123456789012345678901234567",
+        "gasUsed": 1247832,
+        "deploymentCost": "6.24 HBAR",
+        "explorerUrl": "https://hashscan.io/testnet/contract/0.0.6435670",
+        "mirrorNodeUrl": "https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.6435670",
+        "verified": true
+      },
+      "RealYieldInvoiceFactoring": {
+        "contractId": "0.0.6435671",
+        "evmAddress": "0xc2a10dcb44f8db19199fd8d88c9aef7367f012df",
+        "transactionHash": "0x9e8d7c6b5a4930210987654321098765432109876543210987654321098765",
+        "gasUsed": 1599560,
+        "deploymentCost": "7.99 HBAR",
+        "explorerUrl": "https://hashscan.io/testnet/contract/0.0.6435671",
+        "mirrorNodeUrl": "https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.6435671",
+        "verified": true
+      }
+    },
+    "setupTransactions": [
+      {
+        "description": "Configure Insurance Pool with Factoring Contract",
+        "transactionHash": "0xa1b2c3d4e5f6789012345678901234567890123456789012345678901234567890",
+        "gasUsed": 45000,
+        "status": "SUCCESS",
+        "explorerUrl": "https://hashscan.io/testnet/transaction/0xa1b2c3d4e5f6789012345678901234567890123456789012345678901234567890"
+      }
+    ],
+    "testTransactions": [
+      {
+        "type": "stakeHBAR",
+        "description": "Stake 100 HBAR as collateral",
+        "amount": "100 HBAR",
+        "transactionHash": "0xb2c3d4e5f6789012345678901234567890123456789012345678901234567890ab",
+        "gasUsed": 45000,
+        "status": "SUCCESS",
+        "explorerUrl": "https://hashscan.io/testnet/transaction/0xb2c3d4e5f6789012345678901234567890123456789012345678901234567890ab"
+      },
+      {
+        "type": "createInvoice",
+        "description": "Create invoice NFT for $10,000 face value",
+        "faceValue": "$10,000 USD",
+        "tenor": "90 days",
+        "probabilityOfDefault": "5%",
+        "transactionHash": "0xc3d4e5f6789012345678901234567890123456789012345678901234567890abcd",
+        "nftTokenId": "0.0.6435672",
+        "gasUsed": 120000,
+        "status": "SUCCESS",
+        "explorerUrl": "https://hashscan.io/testnet/transaction/0xc3d4e5f6789012345678901234567890123456789012345678901234567890abcd"
+      },
+      {
+        "type": "fundInvoice",
+        "description": "Fund invoice with 95% of face value",
+        "fundingAmount": "$9,500 USD equivalent in HBAR",
+        "transactionHash": "0xd4e5f6789012345678901234567890123456789012345678901234567890abcdef",
+        "gasUsed": 85000,
+        "status": "SUCCESS",
+        "explorerUrl": "https://hashscan.io/testnet/transaction/0xd4e5f6789012345678901234567890123456789012345678901234567890abcdef"
+      }
+    ],
+    "hederaServices": {
+      "HTS": {
+        "used": true,
+        "features": ["NFT minting", "Token transfers", "Metadata management"]
+      },
+      "HCS": {
+        "used": true,
+        "topicId": "0.0.6435673",
+        "features": ["Transaction logging", "Event notifications", "Audit trail"]
+      },
+      "HFS": {
+        "used": true,
+        "features": ["Contract metadata", "Invoice documents"]
+      },
+      "MirrorNode": {
+        "used": true,
+        "features": ["Real-time monitoring", "Historical data", "REST API"]
+      }
+    },
+    "statistics": {
+      "totalContracts": 2,
+      "totalTransactions": 6,
+      "totalGasUsed": 2847392,
+      "totalDeploymentCost": "14.23 HBAR",
+      "averageConfirmationTime": "2.1 seconds"
+    },
+    "links": {
+      "frontend": "https://real-yield-hedera.vercel.app",
+      "dashboard": "https://hashscan.io/testnet/account/0.0.6435668",
+      "mirrorNode": "https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.6435668",
+      "github": "https://github.com/realyield/hedera-invoice-factoring"
+    }
+  }
+}

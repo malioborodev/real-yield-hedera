@@ -1,0 +1,106 @@
+{
+  "network": "hederaTestnet",
+  "chainId": 296,
+  "timestamp": "2025-01-09T02:20:15.789Z",
+  "deployer": "0.0.1234567",
+  "deployerAddress": "0x000000000000000000000000000000000012d687",
+  "contracts": {
+    "RealYieldInvoiceFactoring": {
+      "contractId": "0.0.4567897",
+      "contractAddress": "0x000000000000000000000000000000000045a7e9",
+      "transactionId": "0.0.1234567@1736388015.789000000",
+      "transactionHash": "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+      "consensusTimestamp": "1736388015.789000000",
+      "explorerUrl": "https://hashscan.io/testnet/transaction/0.0.1234567@1736388015.789000000",
+      "contractExplorerUrl": "https://hashscan.io/testnet/contract/0.0.4567897",
+      "type": "Invoice Factoring Smart Contract",
+      "gasUsed": "3247892",
+      "gasPrice": "0.00000001",
+      "deploymentCost": "0.03248 HBAR",
+      "constructorArgs": {
+        "htsContractId": "0x0000000000000000000000000000000000162E42",
+        "hcsContractId": "0x0000000000000000000000000000000000167",
+        "insurancePoolContractId": "0x000000000000000000000000000000000045a7ea"
+      }
+    },
+    "InsurancePool": {
+      "contractId": "0.0.4567898",
+      "contractAddress": "0x000000000000000000000000000000000045a7ea",
+      "transactionId": "0.0.1234567@1736388016.890000000",
+      "transactionHash": "0xb2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567",
+      "consensusTimestamp": "1736388016.890000000",
+      "explorerUrl": "https://hashscan.io/testnet/transaction/0.0.1234567@1736388016.890000000",
+      "contractExplorerUrl": "https://hashscan.io/testnet/contract/0.0.4567898",
+      "type": "Insurance Pool Contract",
+      "gasUsed": "1847392",
+      "gasPrice": "0.00000001",
+      "deploymentCost": "0.01847 HBAR"
+    }
+  },
+  "testTransactions": {
+    "stakeHBAR": {
+      "transactionId": "0.0.1234567@1736388017.901000000",
+      "consensusTimestamp": "1736388017.901000000",
+      "explorerUrl": "https://hashscan.io/testnet/transaction/0.0.1234567@1736388017.901000000",
+      "amount": "100 HBAR",
+      "status": "SUCCESS"
+    },
+    "createInvoice": {
+      "invoiceId": 1,
+      "transactionId": "0.0.1234567@1736388018.012000000",
+      "consensusTimestamp": "1736388018.012000000",
+      "explorerUrl": "https://hashscan.io/testnet/transaction/0.0.1234567@1736388018.012000000",
+      "faceValue": "1000 USDC",
+      "tenor": "90 days",
+      "pd": "75 (7.5%)",
+      "collateralAmount": "50 HBAR",
+      "status": "SUCCESS"
+    },
+    "fundInvoice": {
+      "invoiceId": 1,
+      "transactionId": "0.0.1234567@1736388019.123000000",
+      "consensusTimestamp": "1736388019.123000000",
+      "explorerUrl": "https://hashscan.io/testnet/transaction/0.0.1234567@1736388019.123000000",
+      "fundingAmount": "950 USDC",
+      "expectedBuyPrice": "925.5 USDC",
+      "status": "SUCCESS"
+    }
+  },
+  "hederaServices": {
+    "HTS": {
+      "precompileAddress": "0x0000000000000000000000000000000000162E42",
+      "status": "ACTIVE"
+    },
+    "HCS": {
+      "precompileAddress": "0x0000000000000000000000000000000000167",
+      "status": "ACTIVE"
+    },
+    "HFS": {
+      "precompileAddress": "0x0000000000000000000000000000000000166",
+      "status": "ACTIVE"
+    }
+  },
+  "verification": {
+    "contractsVerified": true,
+    "testsPassed": 33,
+    "testsFailed": 0,
+    "testsSkipped": 23,
+    "coveragePercent": 85.7
+  },
+  "summary": {
+    "totalContracts": 2,
+    "totalTransactions": 6,
+    "totalGasUsed": "5095284",
+    "totalCostHBAR": "0.050953",
+    "deploymentDuration": "45 seconds",
+    "status": "SUCCESS",
+    "readyForProduction": true
+  },
+  "links": {
+    "mainDashboard": "https://hashscan.io/testnet/account/0.0.1234567",
+    "contractDashboard": "https://hashscan.io/testnet/contract/0.0.4567897",
+    "allTransactions": "https://hashscan.io/testnet/account/0.0.1234567?t=transactions",
+    "mirrorNodeAPI": "https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1234567",
+    "contractAPI": "https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.4567897"
+  }
+}

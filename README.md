@@ -2,7 +2,7 @@
 
 > Unlock $2 Trillion Realworld Liquidity into Blockchain powered by Hedera Hashgraph
 
-A decentralized invoice factoring platform that tokenizes real-world invoices into tradeable NFTs, providing transparent pricing, immutable audit trails, and real yield from actual settlements.
+A comprehensive decentralized invoice factoring platform built on Hedera Hashgraph, enabling businesses to unlock liquidity from their outstanding invoices while providing investors with real-world yield opportunities. The platform tokenizes real-world invoices into tradeable NFTs, providing transparent pricing, immutable audit trails, and real yield from actual settlements.
 
 ## 🌟 Features
 
